@@ -272,7 +272,7 @@ Shared field rules:
 
 ## Test-Driven Development
 
-Vitest is the test framework for this feature. It is not installed yet. Unit tests are the fast signal. Acceptance criteria stay the pass/fail list for the feature. A phase is done only when both are true: `npm test` is green for that phase's tests, and the matching acceptance criteria can be checked.
+Vitest is the test framework for this feature. Unit tests are the fast signal. Acceptance criteria stay the pass/fail list for the feature. A phase is done only when both are true: `npm test` is green for that phase's tests, and the matching acceptance criteria can be checked.
 
 Every phase uses the same cycle:
 
@@ -356,7 +356,7 @@ Run `npm test` and confirm these tests fail.
 - `migrations/` contains the users migration.
 - Local D1 has the `users` table.
 
-### Phase 2: User service - PLANNED
+### Phase 2: User service - COMPLETED
 
 **Objective**: Account create, update, delete, and password checks go through one service, proven by unit tests against a fake database.
 
@@ -551,13 +551,14 @@ Hash on write. Compare with a constant-time check on login, update, and delete. 
 
 ### Important Notes
 
-- Zod is not installed. Add it in Phase 2. Vitest and the testing libraries are not installed. Add them before the Phase 1 tests. Do not add bcrypt, an auth framework, a session library, or `@cloudflare/vitest-pool-workers`.
+- Zod, Vitest, and the testing libraries are installed. Do not add bcrypt, an auth framework, a session library, or `@cloudflare/vitest-pool-workers`.
 - Write each phase's tests first. `npm test` must fail for those tests before production code is added, then pass after it. Green Vitest output and the checked acceptance criteria are both required.
 - D1 is server-only. Database modules must not be imported into a client component.
 - `npm run dev` runs on Node. Verify the register and login flow with `npm run preview` before calling the feature done, because D1 is a Workers binding.
 - Do not deploy, and do not apply the migration remotely.
 - Login success is not durable. The next request does not know which teacher signed in.
 - Phase 1: `npm test` failed 5 tests before the migration and binding existed, then passed 5. The migration file is `migrations/0001_create-users.sql`. The `DB` binding is in `wrangler.jsonc`. Local D1 has the `users` table. Remote D1 has no migrations applied.
+- Phase 2: the password, validator, and user-service suites failed to import before those modules existed. After implementation, `npm test` passed 22 tests. `createUser`, `updateUser`, and `deleteUser` write through `src/lib/services/users.ts`. `authenticateUser` checks a login password and returns a public user. Error codes are `duplicate`, `invalid_password`, `not_found`, and `invalid_credentials`. The password hash stays inside the service.
 
 ---
 
@@ -565,22 +566,22 @@ Hash on write. Compare with a constant-time check on login, update, and delete. 
 
 - [x] A local migration creates `users` with primary key, first name, last name, username, email, password hash, and timestamps.
 - [x] Username and email are unique, case-insensitive.
-- [ ] Register stores a PBKDF2 hash and returns the public user with no `password_hash`.
+- [x] Register stores a PBKDF2 hash and returns the public user with no `password_hash`.
 - [ ] Register with a duplicate username or email returns 409 and does not create a second row.
 - [ ] Login with the correct username or email and password returns 200 and the public user.
 - [ ] Login with a wrong password or unknown account returns the same 401 message.
 - [ ] Register and login responses include no `Set-Cookie` header and no token.
 - [ ] Logout returns `{ "ok": true }` and writes nothing to `users`.
-- [ ] Update changes the allowed fields only when `currentPassword` matches, and can replace the hash when `newPassword` is present.
-- [ ] Delete removes the row only when `currentPassword` matches.
+- [x] Update changes the allowed fields only when `currentPassword` matches, and can replace the hash when `newPassword` is present.
+- [x] Delete removes the row only when `currentPassword` matches.
 - [ ] Update and delete return 404 for an unknown id and 401 for a wrong current password.
 - [ ] `/register` and `/login` reject invalid fields before the request, including a confirm-password mismatch.
 - [ ] Successful register and successful login both navigate to `/mcq`.
 - [ ] `/mcq` shows the stub copy and no question UI. Logout returns the teacher to `/login`.
 - [ ] `/` links to `/register` and `/login`.
-- [ ] `npm test` runs Vitest, and the full suite is green.
+- [x] `npm test` runs Vitest, and the full suite is green.
 - [x] Phase 1 schema tests were red before the migration existed, and are green after it.
-- [ ] Phase 2 password, validator, and user-service tests were red before those modules existed, and are green after them.
+- [x] Phase 2 password, validator, and user-service tests were red before those modules existed, and are green after them.
 - [ ] Phase 3 route tests were red before the handlers existed, and are green after them.
 - [ ] Phase 4 component tests were red before the forms and stub existed, and are green after them.
 - [ ] `npm run lint` and `npm run build` succeed.
@@ -609,8 +610,8 @@ Vitest covers the behavior rows above. Three checks stay outside the unit suite:
 
 - Cloudflare D1 — stores `users`. Created locally and bound as `DB`.
 - Web Crypto API — PBKDF2 password hashing on Workers. No third-party hash package.
-- Zod — request validation. Not installed yet; add it in Phase 2.
-- Vitest, `@vitejs/plugin-react`, `@testing-library/react`, `@testing-library/user-event`, `jsdom`, and `vite-tsconfig-paths` — unit tests. Not installed yet; add them before the Phase 1 tests.
+- Zod — request validation. Installed.
+- Vitest, `@vitejs/plugin-react`, `@testing-library/react`, `@testing-library/user-event`, `jsdom`, and `vite-tsconfig-paths` — unit tests. Installed.
 
 ### Internal Dependencies
 
@@ -650,17 +651,15 @@ No environment variables are required for hashing or the local database. Do not 
 
 ## Troubleshooting Guide
 
-No implementation issues yet. Add an entry here when a bug is found and fixed.
+### PBKDF2 salt fails the Next.js type check
 
-### Common Issue Name
+**Problem**: `npm run build` fails in `src/lib/password.ts` with `Uint8Array<ArrayBufferLike>` not assignable to `BufferSource`.
 
-**Problem**: [What goes wrong]
+**Cause**: `crypto.subtle.deriveBits` expects an `ArrayBuffer`-backed view. A plain `Uint8Array` parameter is typed as `ArrayBufferLike`.
 
-**Cause**: [Why it happens]
+**Solution**: Copy the password bytes and the salt into a new `Uint8Array` created from a fresh `ArrayBuffer` before calling `importKey` and `deriveBits`.
 
-**Solution**: [How to fix it]
-
-**Code Reference**: `filepath:line-number`
+**Code Reference**: `src/lib/password.ts:49`
 
 ---
 
@@ -687,8 +686,8 @@ When working with this PRD:
 
 **Last Updated**: October 9, 2026
 
-**Current Phase**: Phase 1 - Database
+**Current Phase**: Phase 2 - User service
 
 **Status**: COMPLETED
 
-**Next Steps**: Stopped for review. Phase 2 has not started. The remote D1 database `faid-quiz-maker` exists and is empty. `0001_create-users.sql` was applied with `--local` only.
+**Next Steps**: Phase 2 is committed on `feature/register-login-logout`. Phase 3 has not started.
