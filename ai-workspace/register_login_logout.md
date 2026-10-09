@@ -401,7 +401,7 @@ Run `npm test` and confirm these tests fail.
 - Passwords hashed before insert and before any password change.
 - Service returns public users only.
 
-### Phase 3: Endpoints - PLANNED
+### Phase 3: Endpoints - COMPLETED
 
 **Objective**: Register, login, logout, edit, and delete match the HTTP contracts, proven by route tests with the user service mocked.
 
@@ -500,6 +500,7 @@ Run `npm test` and confirm these tests fail.
 - `src/lib/password.ts` — PBKDF2 hash and verify
 - `src/lib/services/users.ts` — add, edit, delete, and login lookup
 - `src/lib/validators/auth.ts` — Zod schemas for each request body
+- `src/lib/http.ts` — validation and service error responses
 - `src/app/api/auth/register/route.ts` — create account
 - `src/app/api/auth/login/route.ts` — check password
 - `src/app/api/auth/logout/route.ts` — acknowledge logout
@@ -559,6 +560,7 @@ Hash on write. Compare with a constant-time check on login, update, and delete. 
 - Login success is not durable. The next request does not know which teacher signed in.
 - Phase 1: `npm test` failed 5 tests before the migration and binding existed, then passed 5. The migration file is `migrations/0001_create-users.sql`. The `DB` binding is in `wrangler.jsonc`. Local D1 has the `users` table. Remote D1 has no migrations applied.
 - Phase 2: the password, validator, and user-service suites failed to import before those modules existed. After implementation, `npm test` passed 22 tests. `createUser`, `updateUser`, and `deleteUser` write through `src/lib/services/users.ts`. `authenticateUser` checks a login password and returns a public user. Error codes are `duplicate`, `invalid_password`, `not_found`, and `invalid_credentials`. The password hash stays inside the service.
+- Phase 3: the four route suites failed to import before the handlers existed. After implementation, `npm test` passed 35 tests. Register, login, logout, update, and delete map validation and `UserServiceError` codes to the status codes in this PRD. Login and logout set no cookie and return no token.
 
 ---
 
@@ -567,14 +569,14 @@ Hash on write. Compare with a constant-time check on login, update, and delete. 
 - [x] A local migration creates `users` with primary key, first name, last name, username, email, password hash, and timestamps.
 - [x] Username and email are unique, case-insensitive.
 - [x] Register stores a PBKDF2 hash and returns the public user with no `password_hash`.
-- [ ] Register with a duplicate username or email returns 409 and does not create a second row.
-- [ ] Login with the correct username or email and password returns 200 and the public user.
-- [ ] Login with a wrong password or unknown account returns the same 401 message.
-- [ ] Register and login responses include no `Set-Cookie` header and no token.
-- [ ] Logout returns `{ "ok": true }` and writes nothing to `users`.
+- [x] Register with a duplicate username or email returns 409 and does not create a second row.
+- [x] Login with the correct username or email and password returns 200 and the public user.
+- [x] Login with a wrong password or unknown account returns the same 401 message.
+- [x] Register and login responses include no `Set-Cookie` header and no token.
+- [x] Logout returns `{ "ok": true }` and writes nothing to `users`.
 - [x] Update changes the allowed fields only when `currentPassword` matches, and can replace the hash when `newPassword` is present.
 - [x] Delete removes the row only when `currentPassword` matches.
-- [ ] Update and delete return 404 for an unknown id and 401 for a wrong current password.
+- [x] Update and delete return 404 for an unknown id and 401 for a wrong current password.
 - [ ] `/register` and `/login` reject invalid fields before the request, including a confirm-password mismatch.
 - [ ] Successful register and successful login both navigate to `/mcq`.
 - [ ] `/mcq` shows the stub copy and no question UI. Logout returns the teacher to `/login`.
@@ -582,7 +584,7 @@ Hash on write. Compare with a constant-time check on login, update, and delete. 
 - [x] `npm test` runs Vitest, and the full suite is green.
 - [x] Phase 1 schema tests were red before the migration existed, and are green after it.
 - [x] Phase 2 password, validator, and user-service tests were red before those modules existed, and are green after them.
-- [ ] Phase 3 route tests were red before the handlers existed, and are green after them.
+- [x] Phase 3 route tests were red before the handlers existed, and are green after them.
 - [ ] Phase 4 component tests were red before the forms and stub existed, and are green after them.
 - [ ] `npm run lint` and `npm run build` succeed.
 - [ ] The register, login, logout, and stub flow has been exercised in the browser against the Workers preview.
@@ -686,8 +688,8 @@ When working with this PRD:
 
 **Last Updated**: October 9, 2026
 
-**Current Phase**: Phase 2 - User service
+**Current Phase**: Phase 3 - Endpoints
 
 **Status**: COMPLETED
 
-**Next Steps**: Phase 2 is committed on `feature/register-login-logout`. Phase 3 has not started.
+**Next Steps**: Phase 3 is committed on `feature/register-login-logout`. Phase 4 has not started.
