@@ -327,7 +327,7 @@ Scripts:
 
 ## Implementation Phases
 
-### Phase 1: Database - PLANNED
+### Phase 1: Database - COMPLETED
 
 **Objective**: Teachers can be stored in a local D1 database, and the schema contract is guarded by tests.
 
@@ -495,7 +495,7 @@ Run `npm test` and confirm these tests fail.
 ### Key Files
 
 - `wrangler.jsonc` — D1 binding `DB` for database `faid-quiz-maker`
-- `migrations/<timestamp>_create-users.sql` — `users` table and unique indexes
+- `migrations/0001_create-users.sql` — `users` table and unique indexes
 - `src/lib/db.ts` — reads `env.DB` from `getCloudflareContext()`
 - `src/lib/password.ts` — PBKDF2 hash and verify
 - `src/lib/services/users.ts` — add, edit, delete, and login lookup
@@ -557,13 +557,14 @@ Hash on write. Compare with a constant-time check on login, update, and delete. 
 - `npm run dev` runs on Node. Verify the register and login flow with `npm run preview` before calling the feature done, because D1 is a Workers binding.
 - Do not deploy, and do not apply the migration remotely.
 - Login success is not durable. The next request does not know which teacher signed in.
+- Phase 1: `npm test` failed 5 tests before the migration and binding existed, then passed 5. The migration file is `migrations/0001_create-users.sql`. The `DB` binding is in `wrangler.jsonc`. Local D1 has the `users` table. Remote D1 has no migrations applied.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] A local migration creates `users` with primary key, first name, last name, username, email, password hash, and timestamps.
-- [ ] Username and email are unique, case-insensitive.
+- [x] A local migration creates `users` with primary key, first name, last name, username, email, password hash, and timestamps.
+- [x] Username and email are unique, case-insensitive.
 - [ ] Register stores a PBKDF2 hash and returns the public user with no `password_hash`.
 - [ ] Register with a duplicate username or email returns 409 and does not create a second row.
 - [ ] Login with the correct username or email and password returns 200 and the public user.
@@ -578,7 +579,7 @@ Hash on write. Compare with a constant-time check on login, update, and delete. 
 - [ ] `/mcq` shows the stub copy and no question UI. Logout returns the teacher to `/login`.
 - [ ] `/` links to `/register` and `/login`.
 - [ ] `npm test` runs Vitest, and the full suite is green.
-- [ ] Phase 1 schema tests were red before the migration existed, and are green after it.
+- [x] Phase 1 schema tests were red before the migration existed, and are green after it.
 - [ ] Phase 2 password, validator, and user-service tests were red before those modules existed, and are green after them.
 - [ ] Phase 3 route tests were red before the handlers existed, and are green after them.
 - [ ] Phase 4 component tests were red before the forms and stub existed, and are green after them.
@@ -688,6 +689,6 @@ When working with this PRD:
 
 **Current Phase**: Phase 1 - Database
 
-**Status**: PLANNED
+**Status**: COMPLETED
 
-**Next Steps**: Install Vitest, add `migrations/create-users.test.ts`, and run `npm test` so Phase 1 is red. Then create the local D1 database, add the `DB` binding, and add the `create-users` migration until those tests are green. No application code has been written.
+**Next Steps**: Stopped for review. Phase 2 has not started. The remote D1 database `faid-quiz-maker` exists and is empty. `0001_create-users.sql` was applied with `--local` only.
