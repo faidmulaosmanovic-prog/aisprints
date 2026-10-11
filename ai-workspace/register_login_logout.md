@@ -1,11 +1,11 @@
 Date created: October 9, 2026
-Date last modified: October 9, 2026
+Date last modified: October 11, 2026
 
 # Register, Login, and Logout - Technical PRD
 
 ## Overview/Problem
 
-Quiz Maker will be used by many teachers, and each teacher needs their own account. The app is still the unmodified starter: there is no database, no user table, and no way to register or sign in. This feature adds teacher accounts and the register, login, and logout flows that create and enter those accounts. After a successful register or login, the teacher lands on a stub page for multiple-choice quizzes. Question authoring is a later feature.
+Quiz Maker will be used by many teachers, and each teacher needs their own account. This feature adds teacher accounts and the register, login, and logout flows that create and enter those accounts. After a successful register or login, the teacher lands on a stub page for multiple-choice quizzes. Question authoring is a later feature.
 
 The account identifier is a database primary key named `id`. It is not a cryptographic private key.
 
@@ -31,7 +31,7 @@ We believe that username-and-email accounts with register, login, and logout wil
   - `POST /api/auth/logout`
   - `PATCH /api/users/[id]`
   - `DELETE /api/users/[id]`
-- A register page and a login page.
+- A register page and a login page, using the centered card layout below. Login uses `LoginForm` from `@/components/login-form`. Register uses `SignupForm` from `@/components/signup-form`.
 - After successful register or login, navigate to `/mcq`.
 - `/mcq` is a stub. It states that multiple-choice quizzes will be built later and offers logout.
 - Logout calls `POST /api/auth/logout` and then navigates to `/login`.
@@ -41,9 +41,10 @@ We believe that username-and-email accounts with register, login, and logout wil
 ### Out of Scope
 
 - Multiple-choice questions, quiz data, question tables, or any MCQ behavior beyond the stub page.
-- Social login (Google, GitHub, or any other provider).
+- Social login (Google, GitHub, or any other provider). The supplied login and signup markup includes "Login with Google" and "Sign up with Google". Do not render those buttons and do not call a provider.
+- Password reset. The supplied login markup includes "Forgot your password?". Do not render that link.
 - Session management: no cookies, no JSON Web Tokens, no server-side session store, no "remember me", and no protected routes. Login checks the password and returns the public user. It does not leave the teacher signed in after a reload.
-- Email verification, password reset, and profile settings UI.
+- Email verification and profile settings UI.
 - Roles, admin accounts, and a user list endpoint.
 - Applying migrations to the remote D1 database.
 - `@cloudflare/vitest-pool-workers`, and any unit test that opens a real D1 database, a real network, or the Workers runtime. Unit tests mock `src/lib/db.ts`. Applying the migration locally, `npm run preview`, and the browser pass stay acceptance checks outside the unit suite.
@@ -60,7 +61,7 @@ We believe that username-and-email accounts with register, login, and logout wil
 
 ### Database Schema
 
-D1 is not configured yet. Create a database named `faid-quiz-maker` (matching the Worker name), bind it as `DB` in `wrangler.jsonc`, then regenerate types with `npm run cf-typegen`. Do not edit `cloudflare-env.d.ts` by hand.
+D1 is configured. The database `faid-quiz-maker` is bound as `DB` in `wrangler.jsonc`, and `cloudflare-env.d.ts` was regenerated. Do not edit that file by hand, do not create the database again, and do not apply the migration remotely. The commands below are the ones already used:
 
 Create the migration with Wrangler, then apply it locally only:
 
@@ -228,7 +229,21 @@ Deletes the user after the current password matches. No screen calls this in the
 
 ### User Interface Requirements
 
-Use the existing shadcn/ui components (`button`, `card`, `field`, `input`, `label`). Keep `'use client'` on the form components only. Forms `POST` JSON to the endpoints above. Show the API error message on failure. Disable the submit button while the request is in flight.
+Login and register use the supplied shadcn card layout. Pages stay thin. Each page centers one form:
+
+```tsx
+<div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+  <div className="w-full max-w-sm">
+    {/* LoginForm or SignupForm */}
+  </div>
+</div>
+```
+
+Build the forms from the installed shadcn pieces: `Button`, `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `Field`, `FieldGroup`, `FieldLabel`, `FieldDescription`, and `Input`. Merge classes with `cn` from `@/lib/utils`. The pasted `import { cn } from "cn"` does not resolve in this repo.
+
+Keep `'use client'` on the form components only. Forms `POST` JSON to the endpoints above. Show the API error message on failure. Disable the submit button while the request is in flight.
+
+`LoginForm` accepts `className` and the rest of `React.ComponentProps<"div">`, and applies them on the outer `div`. `SignupForm` spreads `React.ComponentProps<typeof Card>` onto the `Card`.
 
 Shared field rules:
 
@@ -240,6 +255,8 @@ Shared field rules:
 | Email | Required, valid email, max 254 characters, stored lowercase |
 | Password | Required, 8–128 characters, at least one letter and one number |
 
+The supplied signup block has one "Full Name" input. The register endpoint and `users` table require `firstName`, `lastName`, and `username`, so the card uses those three fields instead of a single full name. Email, password, and confirm password stay as in the supplied block.
+
 #### Home (`/`)
 
 - Short line that this is Quiz Maker.
@@ -247,20 +264,33 @@ Shared field rules:
 
 #### Register (`/register`)
 
-- Fields: first name, last name, username, email, password, confirm password.
+Page file: `src/app/register/page.tsx`. It renders `SignupForm` from `@/components/signup-form`.
+
+- Card title: "Create an account".
+- Card description: "Enter your information below to create your account".
+- Fields, in order: first name, last name, username, email, password, confirm password.
+- Email description: "We'll use this to contact you. We will not share your email with anyone else."
+- Password description: "Must be at least 8 characters long."
+- Confirm-password description: "Please confirm your password."
 - Confirm password must match password before submit. Confirm password is not sent to the API.
-- Submit calls `POST /api/auth/register`.
+- Submit button label: "Create Account". It calls `POST /api/auth/register`.
 - Success navigates to `/mcq`.
 - Duplicate username or email shows the 409 message.
-- Link to `/login`.
+- Under the button: "Already have an account?" linking to `/login` with the text "Sign in".
+- Do not include "Sign up with Google".
 
 #### Login (`/login`)
 
-- Fields: username or email, password.
-- Submit calls `POST /api/auth/login`.
+Page file: `src/app/login/page.tsx`. It renders `LoginForm` from `@/components/login-form`.
+
+- Card title: "Login to your account".
+- Card description: "Enter your username or email below to login to your account". The supplied sentence says "email" only. This wording matches `POST /api/auth/login`, which accepts either value as `identifier`.
+- Fields: username or email, then password. The username-or-email input uses `id="email"`, `type="email"` is not required, and the placeholder is `m@example.com`.
+- Submit button label: "Login". It calls `POST /api/auth/login`.
 - Success navigates to `/mcq`.
 - A failed login shows "Incorrect username, email, or password".
-- Link to `/register`.
+- Under the button: "Don't have an account?" linking to `/register` with the text "Sign up".
+- Do not include "Forgot your password?" or "Login with Google".
 
 #### MCQ stub (`/mcq`)
 
@@ -445,13 +475,13 @@ Run `npm test` and confirm these tests fail.
 
 - Register, login, logout, update, and delete endpoints match the contracts above.
 
-### Phase 4: Pages - PLANNED
+### Phase 4: Pages - COMPLETED
 
 **Objective**: A teacher can register or log in and land on the MCQ stub, then log out. Component tests prove the visible behavior.
 
 **Red**: Add client-component tests before the forms exist. Mock `fetch` and `next/navigation`. Run `npm test` and confirm the new tests fail. Keep earlier phases green.
 
-`src/components/auth/register-form.test.tsx`
+`src/components/signup-form.test.tsx`
 
 1. Confirm-password mismatch shows an error and does not call `fetch`.
 2. Invalid fields are rejected before the request.
@@ -459,7 +489,7 @@ Run `npm test` and confirm these tests fail.
 4. A 409 response shows "An account with that username or email already exists".
 5. The page links to `/login`. The link can live in the form or a sibling tested with it.
 
-`src/components/auth/login-form.test.tsx`
+`src/components/login-form.test.tsx`
 
 1. A 200 response navigates to `/mcq`.
 2. A 401 response shows "Incorrect username, email, or password".
@@ -477,11 +507,11 @@ Run `npm test` and confirm these tests fail.
 
 **Implement**:
 
-1. Add `/register`, `/login`, and `/mcq`, with the tested client components doing the work.
+1. Add `/register` and `/login` with the centered card pages above, plus `/mcq`. `SignupForm` and `LoginForm` do the form work.
 2. Point `/` at the home links component.
 3. Wire each form to its endpoint and the success navigation in this PRD.
 
-**Green**: `npm test` passes the full suite. Check the UI acceptance criteria. Then run `npm run lint`, `npm run build`, and the browser pass on `npm run preview`.
+**Green**: The four new suites failed to import before the components existed. After the pages were added, `npm test` passed 48 tests. `npm run lint` and `npm run build` succeeded. The register, login, logout, and stub flow was exercised in the browser on `npm run preview` at `http://localhost:8787`, and that same flow was reviewed and confirmed working on October 11, 2026.
 
 **Deliverables**:
 
@@ -505,11 +535,11 @@ Run `npm test` and confirm these tests fail.
 - `src/app/api/auth/login/route.ts` — check password
 - `src/app/api/auth/logout/route.ts` — acknowledge logout
 - `src/app/api/users/[id]/route.ts` — edit and delete
-- `src/app/register/page.tsx` — register page
-- `src/app/login/page.tsx` — login page
+- `src/app/register/page.tsx` — centered page that renders `SignupForm`
+- `src/app/login/page.tsx` — centered page that renders `LoginForm`
 - `src/app/mcq/page.tsx` — MCQ stub
-- `src/components/auth/register-form.tsx` — register form
-- `src/components/auth/login-form.tsx` — login form
+- `src/components/signup-form.tsx` — register card
+- `src/components/login-form.tsx` — login card
 - `src/components/auth/mcq-stub.tsx` — stub copy and logout
 - `src/components/home-links.tsx` — links from `/` to register and login
 - `vitest.config.ts` — Vitest, jsdom, and the `@/` alias
@@ -521,8 +551,8 @@ Run `npm test` and confirm these tests fail.
 - `src/app/api/auth/login/route.test.ts` — login HTTP contract
 - `src/app/api/auth/logout/route.test.ts` — logout HTTP contract
 - `src/app/api/users/[id]/route.test.ts` — edit and delete HTTP contract
-- `src/components/auth/register-form.test.tsx` — register form
-- `src/components/auth/login-form.test.tsx` — login form
+- `src/components/signup-form.test.tsx` — register form
+- `src/components/login-form.test.tsx` — login form
 - `src/components/auth/mcq-stub.test.tsx` — stub and logout
 - `src/components/home-links.test.tsx` — home links
 
@@ -561,6 +591,7 @@ Hash on write. Compare with a constant-time check on login, update, and delete. 
 - Phase 1: `npm test` failed 5 tests before the migration and binding existed, then passed 5. The migration file is `migrations/0001_create-users.sql`. The `DB` binding is in `wrangler.jsonc`. Local D1 has the `users` table. Remote D1 has no migrations applied.
 - Phase 2: the password, validator, and user-service suites failed to import before those modules existed. After implementation, `npm test` passed 22 tests. `createUser`, `updateUser`, and `deleteUser` write through `src/lib/services/users.ts`. `authenticateUser` checks a login password and returns a public user. Error codes are `duplicate`, `invalid_password`, `not_found`, and `invalid_credentials`. The password hash stays inside the service.
 - Phase 3: the four route suites failed to import before the handlers existed. After implementation, `npm test` passed 35 tests. Register, login, logout, update, and delete map validation and `UserServiceError` codes to the status codes in this PRD. Login and logout set no cookie and return no token.
+- Phase 4: the signup, login, MCQ stub, and home-link suites failed to import before those components existed. After implementation, `npm test` passed 48 tests. `/register` renders `SignupForm`, `/login` renders `LoginForm`, `/mcq` renders the stub, and `/` renders the home links. A mismatched confirm password and a blank login identifier never call `fetch`. Success navigates to `/mcq`. Logout navigates to `/login`.
 
 ---
 
@@ -577,17 +608,17 @@ Hash on write. Compare with a constant-time check on login, update, and delete. 
 - [x] Update changes the allowed fields only when `currentPassword` matches, and can replace the hash when `newPassword` is present.
 - [x] Delete removes the row only when `currentPassword` matches.
 - [x] Update and delete return 404 for an unknown id and 401 for a wrong current password.
-- [ ] `/register` and `/login` reject invalid fields before the request, including a confirm-password mismatch.
-- [ ] Successful register and successful login both navigate to `/mcq`.
-- [ ] `/mcq` shows the stub copy and no question UI. Logout returns the teacher to `/login`.
-- [ ] `/` links to `/register` and `/login`.
+- [x] `/register` and `/login` reject invalid fields before the request, including a confirm-password mismatch.
+- [x] Successful register and successful login both navigate to `/mcq`.
+- [x] `/mcq` shows the stub copy and no question UI. Logout returns the teacher to `/login`.
+- [x] `/` links to `/register` and `/login`.
 - [x] `npm test` runs Vitest, and the full suite is green.
 - [x] Phase 1 schema tests were red before the migration existed, and are green after it.
 - [x] Phase 2 password, validator, and user-service tests were red before those modules existed, and are green after them.
 - [x] Phase 3 route tests were red before the handlers existed, and are green after them.
-- [ ] Phase 4 component tests were red before the forms and stub existed, and are green after them.
-- [ ] `npm run lint` and `npm run build` succeed.
-- [ ] The register, login, logout, and stub flow has been exercised in the browser against the Workers preview.
+- [x] Phase 4 component tests were red before the forms and stub existed, and are green after them.
+- [x] `npm run lint` and `npm run build` succeed.
+- [x] The register, login, logout, and stub flow has been exercised in the browser against the Workers preview.
 
 Vitest covers the behavior rows above. Three checks stay outside the unit suite: the migration was applied to local D1, lint and build succeed, and the preview was exercised in the browser.
 
@@ -686,10 +717,10 @@ When working with this PRD:
 
 ## Current Status
 
-**Last Updated**: October 9, 2026
+**Last Updated**: October 11, 2026
 
-**Current Phase**: Phase 3 - Endpoints
+**Current Phase**: Phase 4 - Pages
 
 **Status**: COMPLETED
 
-**Next Steps**: Phase 3 is committed on `feature/register-login-logout`. Phase 4 has not started.
+**Next Steps**: Reviewed on October 11, 2026. Register, login, logout, and the MCQ stub work. This is the last planned phase for teacher accounts. Google sign-in and forgot-password stay out of scope.
