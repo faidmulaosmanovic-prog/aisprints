@@ -638,7 +638,7 @@ Add to `src/components/signup-form.test.tsx` and `src/components/login-form.test
 - `/mcq` lists questions and who created them, and Delete works from the table
 - Register and login store the teacher, and logout clears that store
 
-### Phase 5: Question editor - PLANNED
+### Phase 5: Question editor - COMPLETED
 
 **Objective**: A teacher can create a question at `/mcq/new` and edit it at `/mcq/[id]/edit`, with Save and Cancel.
 
@@ -661,7 +661,7 @@ Add to `src/components/signup-form.test.tsx` and `src/components/login-form.test
 2. `src/app/mcq/new/page.tsx`.
 3. `src/app/mcq/[id]/edit/page.tsx`, which loads `getQuestion(id)` and calls `notFound()` when it returns `null`.
 
-**Green**: `npm test` passes through Phase 5.
+**Green**: On October 13, 2026, `npm test` failed to load `mcq-editor` because the component did not exist (105 existing tests passed). After the editor and the create and edit pages were added, `npm test` passed 115 tests. `npm run lint` and `npm run build` passed. `/mcq/new` is static and `/mcq/[id]/edit` is dynamic. On `npm run dev` at `http://localhost:3000`, a logged-out visit to `/mcq/new` showed the login link. With a stored teacher, Save created a 3-choice question and returned to the list with that teacher in Created by. Edit loaded the saved values, Cancel returned without a request, and Save added a fourth choice, moved the correct answer, and left `created_by` unchanged. An unknown edit id returned 404.
 
 **Deliverables**:
 
@@ -690,7 +690,7 @@ Add to `src/components/signup-form.test.tsx` and `src/components/login-form.test
 **Green**: `npm test` passes through Phase 6. Then:
 
 1. `npm run lint` and `npm run build` succeed.
-2. On `npm run preview` (`http://localhost:8787`), walk through these steps in the browser:
+2. On `npm run preview` (`http://localhost:3000`), walk through these steps in the browser:
    1. Register or log in, then create a question with 3 choices.
    2. See it in the table, with the creator's name in Created by.
    3. Edit it to add a fourth choice and change the correct answer. Confirm `created_by` is unchanged.
@@ -797,12 +797,12 @@ export default async function McqPage() {
 ## Acceptance Criteria
 
 - [x] A local migration creates `mcq_questions`, `mcq_choices`, and `mcq_attempts` with the columns, foreign keys, checks, and indexes above. `created_by` and `user_id` both reference `users (id)` with `ON DELETE CASCADE`.
-- [ ] A question cannot be saved with fewer than 2 or more than 7 choices, without exactly one correct choice, with a blank choice, or with duplicate choices. This holds in the editor and at the API.
+- [x] A question cannot be saved with fewer than 2 or more than 7 choices, without exactly one correct choice, with a blank choice, or with duplicate choices. This holds in the editor and at the API.
 - [x] Creating a question writes the question, its `created_by`, and all its choices in one batch. A missing user returns 404 and leaves no rows. A failure leaves no partial rows.
 - [x] `/mcq` lists every question, newest first, with Name, Question, Description, Created by, and Actions columns.
 - [x] The Actions menu on each row offers Edit, Preview, and Delete.
-- [ ] "New question" opens `/mcq/new`. With a stored teacher, Save creates the question for that teacher and returns to `/mcq`. Without a stored teacher, the page links to `/login` and does not save. Cancel returns to `/mcq` without saving.
-- [ ] Edit loads the saved values. Save updates the question, keeps `created_by`, keeps the ids of unchanged choices, adds new choices, removes the ones that were dropped, and can change the correct answer.
+- [x] "New question" opens `/mcq/new`. With a stored teacher, Save creates the question for that teacher and returns to `/mcq`. Without a stored teacher, the page links to `/login` and does not save. Cancel returns to `/mcq` without saving.
+- [x] Edit loads the saved values. Save updates the question, keeps `created_by`, keeps the ids of unchanged choices, adds new choices, removes the ones that were dropped, and can change the correct answer.
 - [ ] An unknown id on edit or preview shows the Next.js 404 page. An unknown id on the API returns 404 "Question not found".
 - [x] Delete asks for confirmation. Confirming removes the question, its choices, and its attempts, then refreshes the table. Cancel changes nothing.
 - [ ] Preview does not send which choice is correct before an attempt is submitted.
@@ -916,7 +916,7 @@ When working with this PRD:
 
 **Last Updated**: October 13, 2026
 
-**Current Phase**: Phase 4 - Question list
+**Current Phase**: Phase 5 - Question editor
 
 **Status**: COMPLETED
 
@@ -935,4 +935,5 @@ When working with this PRD:
 4. Phase 2 is complete. `npm test` passed 79 tests after the services existed.
 5. Phase 3 is complete. Route tests were red before the handlers existed, then `npm test` passed 92 tests.
 6. Phase 4 is complete. List tests were red before the page existed, then `npm test` passed 105 tests. `/mcq` lists questions and deletes them after confirmation. Register and login store the teacher; logout clears that store.
-7. Start Phase 5 after review: the question editor at `/mcq/new` and `/mcq/[id]/edit`. Do not start it until asked. The full browser pass on `npm run preview` stays in Phase 6.
+7. Phase 5 is complete. The editor suite was red before the component existed, then `npm test` passed 115 tests. Create and edit work on the dev server against local D1.
+8. Start Phase 6 after review: preview, attempts, and the full browser pass on `npm run preview`. Do not start it until asked.

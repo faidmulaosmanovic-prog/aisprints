@@ -38,6 +38,9 @@ export function saveReturnedUser(value: unknown) {
 }
 
 export function readCurrentUser(): CurrentUser | null {
+	if (typeof sessionStorage === "undefined") {
+		return null;
+	}
 	const raw = sessionStorage.getItem(STORAGE_KEY);
 	if (!raw) {
 		return null;
