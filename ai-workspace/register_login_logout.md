@@ -1,5 +1,5 @@
 Date created: October 9, 2026
-Date last modified: October 11, 2026
+Date last modified: October 12, 2026
 
 # Register, Login, and Logout - Technical PRD
 
@@ -46,7 +46,7 @@ We believe that username-and-email accounts with register, login, and logout wil
 - Session management: no cookies, no JSON Web Tokens, no server-side session store, no "remember me", and no protected routes. Login checks the password and returns the public user. It does not leave the teacher signed in after a reload.
 - Email verification and profile settings UI.
 - Roles, admin accounts, and a user list endpoint.
-- Applying migrations to the remote D1 database.
+- Applying a further remote D1 migration without explicit human approval. `0001_create-users.sql` is already applied on remote `faid-quiz-maker`.
 - `@cloudflare/vitest-pool-workers`, and any unit test that opens a real D1 database, a real network, or the Workers runtime. Unit tests mock `src/lib/db.ts`. Applying the migration locally, `npm run preview`, and the browser pass stay acceptance checks outside the unit suite.
 
 ### Cut
@@ -61,9 +61,9 @@ We believe that username-and-email accounts with register, login, and logout wil
 
 ### Database Schema
 
-D1 is configured. The database `faid-quiz-maker` is bound as `DB` in `wrangler.jsonc`, and `cloudflare-env.d.ts` was regenerated. Do not edit that file by hand, do not create the database again, and do not apply the migration remotely. The commands below are the ones already used:
+D1 is configured. Remote database `faid-quiz-maker` (`e8a16210-2d19-4b96-8354-aaf0fddf8b9f`) was created with Wrangler and is bound as `DB` in `wrangler.jsonc`. `cloudflare-env.d.ts` was regenerated. Do not edit that file by hand, and do not create the database again.
 
-Create the migration with Wrangler, then apply it locally only:
+The users migration was applied locally during Phase 1. It was later applied on the remote database: `d1_migrations` records `0001_create-users.sql` at `2026-10-09 11:00:10`. The commands already used are:
 
 ```bash
 npx wrangler d1 create faid-quiz-maker
@@ -71,7 +71,7 @@ npx wrangler d1 migrations create faid-quiz-maker create-users
 npx wrangler d1 migrations apply faid-quiz-maker --local
 ```
 
-Never run `migrations apply` with `--remote`.
+A later remote migration still needs an explicit approval. Verify the target database, review the pending files, and do not run `migrations apply` with `--remote` unless that approval is given.
 
 ```sql
 CREATE TABLE users (
@@ -513,6 +513,30 @@ Run `npm test` and confirm these tests fail.
 
 **Green**: The four new suites failed to import before the components existed. After the pages were added, `npm test` passed 48 tests. `npm run lint` and `npm run build` succeeded. The register, login, logout, and stub flow was exercised in the browser on `npm run preview` at `http://localhost:8787`, and that same flow was reviewed and confirmed working on October 11, 2026.
 
+Local preview stays the Phase 4 history above. Production evidence is separate:
+
+### Production Deployment Evidence
+
+Deployment command: `npm run deploy`
+
+Deployment result: Success. Wrangler logged `Deployed quiz triggers (3.70 sec)` and Current Version ID `5c7820d9-a2bc-4bc6-a5d0-87544694e5fc`.
+
+Production URL: https://quiz.faidquizmaker.workers.dev
+
+Deployment date: October 12, 2026, 09:21:11 CEST (2026-10-12T07:21:11.637Z)
+
+Verified on October 12, 2026, from 21:24 CEST, against that deployed URL.
+
+Application availability: Pass. `/`, `/register`, `/login`, and `/mcq` each returned HTTP 200.
+
+Registration and duplicate-account handling: Pass. `POST /api/auth/register` for `prodcheck1012` returned 201 and a public user with no `password_hash` and no token. Repeating that account returned 409, "An account with that username or email already exists". The register page showed that same message and stayed on `/register`.
+
+Login with correct and incorrect credentials: Pass. A wrong password stayed on `/login` and showed "Incorrect username, email, or password" (HTTP 401). `prodcheck1012` with the correct password returned HTTP 200 and the browser navigated to `/mcq`. Neither response set a cookie.
+
+Logout and MCQ stub: Pass. `/mcq` showed the heading "Multiple-choice quizzes" and the sentence "Multiple-choice quizzes are not built yet." Logout posted to `/api/auth/logout`, returned `{ "ok": true }` with HTTP 200, and the browser returned to `/login`.
+
+Production database status: `0001_create-users.sql` is applied on remote D1 database `faid-quiz-maker` (`e8a16210-2d19-4b96-8354-aaf0fddf8b9f`). `d1_migrations` records that file with `applied_at` `2026-10-09 11:00:10`. `npx wrangler d1 migrations list faid-quiz-maker --remote` reported no migrations left to apply. Remote tables and indexes include `users`, `idx_users_username`, and `idx_users_email`.
+
 **Deliverables**:
 
 - Register, login, logout, and the MCQ stub work in the browser.
@@ -586,9 +610,24 @@ Hash on write. Compare with a constant-time check on login, update, and delete. 
 - Write each phase's tests first. `npm test` must fail for those tests before production code is added, then pass after it. Green Vitest output and the checked acceptance criteria are both required.
 - D1 is server-only. Database modules must not be imported into a client component.
 - `npm run dev` runs on Node. Verify the register and login flow with `npm run preview` before calling the feature done, because D1 is a Workers binding.
-- Do not deploy, and do not apply the migration remotely.
+
+### Deployment and Release Requirements
+
+Deploy the application to the target Cloudflare Workers production environment after the implementation passes the required tests, lint, and build checks. The completed evidence is in Production Deployment Evidence.
+
+Verify that the deployed application loads and that registration, login, logout, and the MCQ stub work in the production environment.
+
+Record the deployment command, deployment result, deployed URL, timestamp, and verification results in the development log.
+
+Keep local preview verification and production deployment verification clearly separated.
+
+Apply production database migrations only when explicitly required by the release plan, and verify their successful execution.
+
+Never claim a production deployment or remote migration succeeded without verifiable evidence.
+
+Continue to respect the existing authentication scope and security requirements.
 - Login success is not durable. The next request does not know which teacher signed in.
-- Phase 1: `npm test` failed 5 tests before the migration and binding existed, then passed 5. The migration file is `migrations/0001_create-users.sql`. The `DB` binding is in `wrangler.jsonc`. Local D1 has the `users` table. Remote D1 has no migrations applied.
+- Phase 1: `npm test` failed 5 tests before the migration and binding existed, then passed 5. The migration file is `migrations/0001_create-users.sql`. The `DB` binding is in `wrangler.jsonc`. Local D1 has the `users` table. Remote D1 also has `0001_create-users.sql` applied; see Production Deployment Evidence.
 - Phase 2: the password, validator, and user-service suites failed to import before those modules existed. After implementation, `npm test` passed 22 tests. `createUser`, `updateUser`, and `deleteUser` write through `src/lib/services/users.ts`. `authenticateUser` checks a login password and returns a public user. Error codes are `duplicate`, `invalid_password`, `not_found`, and `invalid_credentials`. The password hash stays inside the service.
 - Phase 3: the four route suites failed to import before the handlers existed. After implementation, `npm test` passed 35 tests. Register, login, logout, update, and delete map validation and `UserServiceError` codes to the status codes in this PRD. Login and logout set no cookie and return no token.
 - Phase 4: the signup, login, MCQ stub, and home-link suites failed to import before those components existed. After implementation, `npm test` passed 48 tests. `/register` renders `SignupForm`, `/login` renders `LoginForm`, `/mcq` renders the stub, and `/` renders the home links. A mismatched confirm password and a blank login identifier never call `fetch`. Success navigates to `/mcq`. Logout navigates to `/login`.
@@ -622,6 +661,14 @@ Hash on write. Compare with a constant-time check on login, update, and delete. 
 
 Vitest covers the behavior rows above. Three checks stay outside the unit suite: the migration was applied to local D1, lint and build succeed, and the preview was exercised in the browser.
 
+Production release criteria, verified separately from the local preview:
+
+- [x] Application deployed successfully to Cloudflare Workers. `npm run deploy` finished October 12, 2026 at 09:21:11 CEST. Current Version ID `5c7820d9-a2bc-4bc6-a5d0-87544694e5fc`.
+- [x] Production URL loads successfully. https://quiz.faidquizmaker.workers.dev returned HTTP 200 for `/`, `/register`, `/login`, and `/mcq` on October 12, 2026 at 21:24 CEST.
+- [x] Authentication flows verified against production. Register returned 201, a duplicate returned 409, a wrong password returned 401, a correct login opened `/mcq`, and logout returned to `/login`.
+- [x] Production database schema verified. Remote `users`, `idx_users_username`, and `idx_users_email` exist. `0001_create-users.sql` is applied at `2026-10-09 11:00:10`.
+- [x] Deployment command and verification results recorded in the development log. See Production Deployment Evidence.
+
 ---
 
 ## Success Metrics
@@ -641,7 +688,7 @@ Vitest covers the behavior rows above. Three checks stay outside the unit suite:
 
 ### External Dependencies
 
-- Cloudflare D1 — stores `users`. Created locally and bound as `DB`.
+- Cloudflare D1 — stores `users`. Remote database `faid-quiz-maker` (`e8a16210-2d19-4b96-8354-aaf0fddf8b9f`) was created with Wrangler and is bound as `DB`. The users migration was applied to local D1 during Phase 1, then to remote D1 at `2026-10-09 11:00:10`. Further remote migrations require explicit human approval.
 - Web Crypto API — PBKDF2 password hashing on Workers. No third-party hash package.
 - Zod — request validation. Installed.
 - Vitest, `@vitejs/plugin-react`, `@testing-library/react`, `@testing-library/user-event`, `jsdom`, and `vite-tsconfig-paths` — unit tests. Installed.
@@ -666,8 +713,8 @@ No environment variables are required for hashing or the local database. Do not 
 - **Risk**: Anonymous SQL placeholders or string-built queries fail locally or accept injection.
 - **Mitigation**: Numbered placeholders only, inside the user service.
 
-- **Risk**: Someone applies the migration to remote D1 during implementation.
-- **Mitigation**: Local apply only. Remote apply stays a separate, explicit decision.
+- **Risk**: A later migration is applied to remote D1 without review.
+- **Mitigation**: `0001_create-users.sql` is already applied remotely and recorded above. Any further remote apply needs an explicit approval after the pending files are reviewed.
 
 - **Risk**: Tests pass without proving the feature, or the suite is green only because the tests were written after the code.
 - **Mitigation**: Each phase starts with a recorded red run. Assertions check status codes, response bodies, stored hashes, and visible UI. A test whose assertion cannot fail does not count.
@@ -710,17 +757,25 @@ When working with this PRD:
 8. Add troubleshooting entries when bugs are found and fixed.
 9. Keep all sections current. Remove outdated information.
 10. Use code references format: `filepath:line-number` when citing code.
-11. Do not deploy. Do not run `wrangler d1 migrations apply` with `--remote`.
+11. Follow the Deployment and Release Requirements section. Deploy to Cloudflare Workers after required checks pass, and record verifiable deployment evidence. Do not apply remote D1 migrations automatically; verify the target database, review pending migrations, and obtain explicit human approval before applying them.
+
 12. Do not add `@cloudflare/vitest-pool-workers`. Mock `@/lib/db` in unit tests.
 
 ---
 
 ## Current Status
 
-**Last Updated**: October 11, 2026
+**Last Updated**: October 12, 2026
 
-**Current Phase**: Phase 4 - Pages
+**Implementation Status**: Phase 1–4 completed.
 
-**Status**: COMPLETED
+**Implementation Verification**: Unit tests, lint, build, and the local Workers preview at `http://localhost:8787` on October 11, 2026 are recorded in the phase history above.
 
-**Next Steps**: Reviewed on October 11, 2026. Register, login, logout, and the MCQ stub work. This is the last planned phase for teacher accounts. Google sign-in and forgot-password stay out of scope.
+**Release Status**: Production deployment and the remote users schema are verified. `npm run deploy` published https://quiz.faidquizmaker.workers.dev on October 12, 2026 at 09:21:11 CEST, version `5c7820d9-a2bc-4bc6-a5d0-87544694e5fc`. Availability, registration, duplicate handling, login, logout, and the MCQ stub passed on that URL the same day. Remote `0001_create-users.sql` was applied at `2026-10-09 11:00:10`.
+
+**Next Steps**:
+
+1. Production deployment is documented in Production Deployment Evidence.
+2. Production D1 migration status is verified. No migrations were left to apply.
+3. The development log holds the command, URL, and verification results.
+4. Keep the authentication scope unchanged. Google sign-in, forgot-password, and session management stay out of scope.
