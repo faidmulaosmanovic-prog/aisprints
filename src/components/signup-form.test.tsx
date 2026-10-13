@@ -3,10 +3,16 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SignupForm } from "@/components/signup-form";
 
-const { push, fetchMock } = vi.hoisted(() => ({
-	push: vi.fn(),
-	fetchMock: vi.fn(),
-}));
+const { push, fetchMock, storedBeforeNavigate } = vi.hoisted(() => {
+	const storedBeforeNavigate = { value: null as string | null };
+	return {
+		storedBeforeNavigate,
+		fetchMock: vi.fn(),
+		push: vi.fn(() => {
+			storedBeforeNavigate.value = sessionStorage.getItem("quiz-maker.user");
+		}),
+	};
+});
 
 vi.mock("next/navigation", () => ({
 	useRouter: () => ({ push }),
@@ -32,6 +38,8 @@ async function fillAccount(user: ReturnType<typeof userEvent.setup>, confirmPass
 describe("SignupForm", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		sessionStorage.clear();
+		storedBeforeNavigate.value = null;
 		vi.stubGlobal("fetch", fetchMock);
 	});
 
@@ -82,6 +90,44 @@ describe("SignupForm", () => {
 			}),
 		);
 		expect(push).toHaveBeenCalledWith("/mcq");
+	});
+
+	it("stores the returned user before navigating to /mcq", async () => {
+		const user = userEvent.setup();
+		const created = {
+			id: "user-ada",
+			firstName: "Ada",
+			lastName: "Lovelace",
+			username: "ada",
+		};
+		fetchMock.mockResolvedValue({
+			ok: true,
+			status: 201,
+			json: async () => ({ user: created }),
+		});
+		render(<SignupForm />);
+
+		await fillAccount(user);
+		await user.click(screen.getByRole("button", { name: "Create Account" }));
+
+		expect(storedBeforeNavigate.value).toBe(JSON.stringify(created));
+		expect(push).toHaveBeenCalledWith("/mcq");
+	});
+
+	it("does not store a user when registration fails", async () => {
+		const user = userEvent.setup();
+		fetchMock.mockResolvedValue({
+			ok: false,
+			status: 409,
+			json: async () => ({ error: "An account with that username or email already exists" }),
+		});
+		render(<SignupForm />);
+
+		await fillAccount(user);
+		await user.click(screen.getByRole("button", { name: "Create Account" }));
+
+		expect(sessionStorage.getItem("quiz-maker.user")).toBeNull();
+		expect(push).not.toHaveBeenCalled();
 	});
 
 	it("shows the duplicate-account message from a 409", async () => {

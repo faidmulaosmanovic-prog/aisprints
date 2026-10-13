@@ -3,10 +3,16 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginForm } from "@/components/login-form";
 
-const { push, fetchMock } = vi.hoisted(() => ({
-	push: vi.fn(),
-	fetchMock: vi.fn(),
-}));
+const { push, fetchMock, storedBeforeNavigate } = vi.hoisted(() => {
+	const storedBeforeNavigate = { value: null as string | null };
+	return {
+		storedBeforeNavigate,
+		fetchMock: vi.fn(),
+		push: vi.fn(() => {
+			storedBeforeNavigate.value = sessionStorage.getItem("quiz-maker.user");
+		}),
+	};
+});
 
 vi.mock("next/navigation", () => ({
 	useRouter: () => ({ push }),
@@ -15,6 +21,8 @@ vi.mock("next/navigation", () => ({
 describe("LoginForm", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		sessionStorage.clear();
+		storedBeforeNavigate.value = null;
 		vi.stubGlobal("fetch", fetchMock);
 	});
 
@@ -58,6 +66,46 @@ describe("LoginForm", () => {
 			}),
 		);
 		expect(push).toHaveBeenCalledWith("/mcq");
+	});
+
+	it("stores the returned user before navigating to /mcq", async () => {
+		const user = userEvent.setup();
+		const account = {
+			id: "user-ada",
+			firstName: "Ada",
+			lastName: "Lovelace",
+			username: "ada",
+		};
+		fetchMock.mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ user: account }),
+		});
+		render(<LoginForm />);
+
+		await user.type(screen.getByLabelText("Username or email"), "ada@example.com");
+		await user.type(screen.getByLabelText("Password"), "correct-horse-1");
+		await user.click(screen.getByRole("button", { name: "Login" }));
+
+		expect(storedBeforeNavigate.value).toBe(JSON.stringify(account));
+		expect(push).toHaveBeenCalledWith("/mcq");
+	});
+
+	it("does not store a user when login fails", async () => {
+		const user = userEvent.setup();
+		fetchMock.mockResolvedValue({
+			ok: false,
+			status: 401,
+			json: async () => ({ error: "Invalid username or password" }),
+		});
+		render(<LoginForm />);
+
+		await user.type(screen.getByLabelText("Username or email"), "ada@example.com");
+		await user.type(screen.getByLabelText("Password"), "correct-horse-1");
+		await user.click(screen.getByRole("button", { name: "Login" }));
+
+		expect(sessionStorage.getItem("quiz-maker.user")).toBeNull();
+		expect(push).not.toHaveBeenCalled();
 	});
 
 	it("shows the shared failure message from a 401", async () => {

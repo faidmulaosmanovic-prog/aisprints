@@ -588,7 +588,7 @@ Test rules:
 
 - Four endpoints that match the contracts above
 
-### Phase 4: Question list - PLANNED
+### Phase 4: Question list - COMPLETED
 
 **Objective**: `/mcq` shows the question table, including who created each question, with Edit, Preview, and Delete actions. Register and login remember the teacher, and logout forgets them.
 
@@ -630,7 +630,7 @@ Add to `src/components/signup-form.test.tsx` and `src/components/login-form.test
 4. Add `src/components/mcq/mcq-list.tsx`.
 5. Change `src/app/mcq/page.tsx` to load `listQuestions()` and render `McqList`, with `dynamic = "force-dynamic"`.
 
-**Green**: `npm test` passes through Phase 4.
+**Green**: On October 13, 2026, `npm test` failed to load `current-user`, `logout-button`, and `mcq-list` because those files did not exist, and the new login and signup assertions failed because nothing was stored before navigation (94 existing tests passed). After the list, storage, and logout were added, `npm test` passed 105 tests. `npm run lint` and `npm run build` passed, and `/mcq` is dynamic. On `npm run dev` at `http://localhost:3000`, the table showed a question created by Ada Lovelace, Cancel left it in place, Confirm removed the question, its choices, and left the empty state. Register and login stored the teacher before `/mcq`, and Logout cleared that store and returned to `/login`.
 
 **Deliverables**:
 
@@ -799,18 +799,18 @@ export default async function McqPage() {
 - [x] A local migration creates `mcq_questions`, `mcq_choices`, and `mcq_attempts` with the columns, foreign keys, checks, and indexes above. `created_by` and `user_id` both reference `users (id)` with `ON DELETE CASCADE`.
 - [ ] A question cannot be saved with fewer than 2 or more than 7 choices, without exactly one correct choice, with a blank choice, or with duplicate choices. This holds in the editor and at the API.
 - [x] Creating a question writes the question, its `created_by`, and all its choices in one batch. A missing user returns 404 and leaves no rows. A failure leaves no partial rows.
-- [ ] `/mcq` lists every question, newest first, with Name, Question, Description, Created by, and Actions columns.
-- [ ] The Actions menu on each row offers Edit, Preview, and Delete.
+- [x] `/mcq` lists every question, newest first, with Name, Question, Description, Created by, and Actions columns.
+- [x] The Actions menu on each row offers Edit, Preview, and Delete.
 - [ ] "New question" opens `/mcq/new`. With a stored teacher, Save creates the question for that teacher and returns to `/mcq`. Without a stored teacher, the page links to `/login` and does not save. Cancel returns to `/mcq` without saving.
 - [ ] Edit loads the saved values. Save updates the question, keeps `created_by`, keeps the ids of unchanged choices, adds new choices, removes the ones that were dropped, and can change the correct answer.
 - [ ] An unknown id on edit or preview shows the Next.js 404 page. An unknown id on the API returns 404 "Question not found".
-- [ ] Delete asks for confirmation. Confirming removes the question, its choices, and its attempts, then refreshes the table. Cancel changes nothing.
+- [x] Delete asks for confirmation. Confirming removes the question, its choices, and its attempts, then refreshes the table. Cancel changes nothing.
 - [ ] Preview does not send which choice is correct before an attempt is submitted.
 - [ ] Submitting an answer in preview inserts one `mcq_attempts` row with the selected `choice_id`, the stored teacher's `user_id`, and the correct flag decided by the server, and shows Correct or Incorrect.
 - [x] A choice id from another question is rejected with 400 on update and on attempt.
-- [ ] Register and login store the teacher. Logout clears that store and returns to `/login`.
-- [ ] Every phase's tests were red before the code existed and green after it. The full `npm test` suite, including auth, is green.
-- [ ] `npm run lint` and `npm run build` succeed.
+- [x] Register and login store the teacher. Logout clears that store and returns to `/login`.
+- [ ] Every phase's tests were red before the code existed and green after it. The full `npm test` suite, including auth, is green. Phases 1–4 are recorded. Phases 5 and 6 are still planned.
+- [x] `npm run lint` and `npm run build` succeed.
 - [ ] The full flow has been exercised in the browser on `npm run preview`, and the attempt rows were checked in local D1.
 
 ---
@@ -889,7 +889,8 @@ No environment variables are needed.
 
 ## Troubleshooting Guide
 
-No issues recorded yet. Add entries as they are found and fixed during implementation.
+- **October 13, 2026 — shadcn CLI and `cn`**: `npx shadcn@latest add` stopped to ask whether to overwrite `button.tsx`. Answer no. It still installs the `cn` package and writes `import { cn } from "cn"` in new files, while the rest of this repo imports `cn` from `@/lib/utils`. Uninstall `cn` and change only that import in the new files. Do not overwrite `button.tsx`.
+- **October 13, 2026 — "New question" role**: Rendering the create control with `Button`'s `render` prop sets `role="button"` on the anchor, so it is no longer a link. Use `Link` with `buttonVariants()` so the control stays a link to `/mcq/new`.
 
 ---
 
@@ -915,7 +916,7 @@ When working with this PRD:
 
 **Last Updated**: October 13, 2026
 
-**Current Phase**: Phase 3 - Endpoints
+**Current Phase**: Phase 4 - Question list
 
 **Status**: COMPLETED
 
@@ -933,4 +934,5 @@ When working with this PRD:
 3. Phase 1 is complete. `0002_create-mcq-tables.sql` is applied on local D1 only.
 4. Phase 2 is complete. `npm test` passed 79 tests after the services existed.
 5. Phase 3 is complete. Route tests were red before the handlers existed, then `npm test` passed 92 tests.
-6. Start Phase 4 after review: add the shadcn components, write the list tests, record the red run, and then build the question table.
+6. Phase 4 is complete. List tests were red before the page existed, then `npm test` passed 105 tests. `/mcq` lists questions and deletes them after confirmation. Register and login store the teacher; logout clears that store.
+7. Start Phase 5 after review: the question editor at `/mcq/new` and `/mcq/[id]/edit`. Do not start it until asked. The full browser pass on `npm run preview` stays in Phase 6.

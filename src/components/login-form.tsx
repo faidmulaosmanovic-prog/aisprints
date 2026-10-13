@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { saveReturnedUser } from "@/lib/current-user";
 import { cn } from "@/lib/utils";
 import { loginSchema } from "@/lib/validators/auth";
 
@@ -49,6 +50,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 				setError(await readError(response, "Unable to sign in"));
 				return;
 			}
+			const body = (await response.json()) as { user?: unknown };
+			saveReturnedUser(body.user);
 			router.push("/mcq");
 		} catch {
 			setError("Unable to sign in");

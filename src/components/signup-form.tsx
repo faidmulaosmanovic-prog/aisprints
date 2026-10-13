@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { saveReturnedUser } from "@/lib/current-user";
 import { registerSchema } from "@/lib/validators/auth";
 
 const fieldMessages: Record<string, string> = {
@@ -67,6 +68,8 @@ export function SignupForm({ className, ...props }: React.ComponentProps<typeof 
 				setError(await readError(response, "Unable to create account"));
 				return;
 			}
+			const body = (await response.json()) as { user?: unknown };
+			saveReturnedUser(body.user);
 			router.push("/mcq");
 		} catch {
 			setError("Unable to create account");
