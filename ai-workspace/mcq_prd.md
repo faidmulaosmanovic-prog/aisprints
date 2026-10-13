@@ -546,7 +546,7 @@ Test rules:
 - One validator module shared by the server and the editor
 - One service per area, and no direct `getDb` call outside `src/lib/services/`
 
-### Phase 3: Endpoints - PLANNED
+### Phase 3: Endpoints - COMPLETED
 
 **Objective**: Create, update, delete, and record-attempt follow the HTTP contracts above, as shown by route tests with the services mocked.
 
@@ -582,7 +582,7 @@ Test rules:
 1. Extend `serviceError` in `src/lib/http.ts`.
 2. Add `src/app/api/mcqs/route.ts` (`POST`), `src/app/api/mcqs/[id]/route.ts` (`PUT`, `DELETE`), and `src/app/api/mcqs/[id]/attempts/route.ts` (`POST`). Use `params: Promise<{ id: string }>`, as in `src/app/api/users/[id]/route.ts`.
 
-**Green**: `npm test` passes through Phase 3, and every auth route test is still green.
+**Green**: On October 13, 2026, `npm test` failed to load the three route suites because the handlers did not exist, and `serviceError` returned 500 for a missing question (79 existing tests passed). After the handlers and error mapping were added, `npm test` passed 92 tests, including the auth route tests. `npm run lint` and `npm run build` passed.
 
 **Deliverables**:
 
@@ -798,7 +798,7 @@ export default async function McqPage() {
 
 - [x] A local migration creates `mcq_questions`, `mcq_choices`, and `mcq_attempts` with the columns, foreign keys, checks, and indexes above. `created_by` and `user_id` both reference `users (id)` with `ON DELETE CASCADE`.
 - [ ] A question cannot be saved with fewer than 2 or more than 7 choices, without exactly one correct choice, with a blank choice, or with duplicate choices. This holds in the editor and at the API.
-- [ ] Creating a question writes the question, its `created_by`, and all its choices in one batch. A missing user returns 404 and leaves no rows. A failure leaves no partial rows.
+- [x] Creating a question writes the question, its `created_by`, and all its choices in one batch. A missing user returns 404 and leaves no rows. A failure leaves no partial rows.
 - [ ] `/mcq` lists every question, newest first, with Name, Question, Description, Created by, and Actions columns.
 - [ ] The Actions menu on each row offers Edit, Preview, and Delete.
 - [ ] "New question" opens `/mcq/new`. With a stored teacher, Save creates the question for that teacher and returns to `/mcq`. Without a stored teacher, the page links to `/login` and does not save. Cancel returns to `/mcq` without saving.
@@ -807,7 +807,7 @@ export default async function McqPage() {
 - [ ] Delete asks for confirmation. Confirming removes the question, its choices, and its attempts, then refreshes the table. Cancel changes nothing.
 - [ ] Preview does not send which choice is correct before an attempt is submitted.
 - [ ] Submitting an answer in preview inserts one `mcq_attempts` row with the selected `choice_id`, the stored teacher's `user_id`, and the correct flag decided by the server, and shows Correct or Incorrect.
-- [ ] A choice id from another question is rejected with 400 on update and on attempt.
+- [x] A choice id from another question is rejected with 400 on update and on attempt.
 - [ ] Register and login store the teacher. Logout clears that store and returns to `/login`.
 - [ ] Every phase's tests were red before the code existed and green after it. The full `npm test` suite, including auth, is green.
 - [ ] `npm run lint` and `npm run build` succeed.
@@ -915,7 +915,7 @@ When working with this PRD:
 
 **Last Updated**: October 13, 2026
 
-**Current Phase**: Phase 2 - Validators and services
+**Current Phase**: Phase 3 - Endpoints
 
 **Status**: COMPLETED
 
@@ -931,5 +931,6 @@ When working with this PRD:
    - deleting a user deletes their questions and attempts
 2. Work happens on branch `mcq-crud`.
 3. Phase 1 is complete. `0002_create-mcq-tables.sql` is applied on local D1 only.
-4. Phase 2 is complete. Validator, MCQ service, and attempts service tests were red before those modules existed, then `npm test` passed 79 tests.
-5. Start Phase 3 after review: write the route tests, record the red run, and then add the handlers.
+4. Phase 2 is complete. `npm test` passed 79 tests after the services existed.
+5. Phase 3 is complete. Route tests were red before the handlers existed, then `npm test` passed 92 tests.
+6. Start Phase 4 after review: add the shadcn components, write the list tests, record the red run, and then build the question table.

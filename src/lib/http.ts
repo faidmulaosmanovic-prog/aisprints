@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
+import { McqServiceError } from "@/lib/services/mcq";
 import { UserServiceError } from "@/lib/services/users";
 
-const statusByCode = {
+const userStatusByCode = {
 	duplicate: 409,
 	invalid_password: 401,
 	not_found: 404,
 	invalid_credentials: 401,
+} as const;
+
+const mcqStatusByCode = {
+	not_found: 404,
+	user_not_found: 404,
+	invalid_choice: 400,
 } as const;
 
 export async function readJson(request: Request): Promise<unknown> {
@@ -30,7 +37,11 @@ export function validationError(error: { issues: { path: PropertyKey[]; message:
 
 export function serviceError(error: unknown, fallback: string) {
 	if (error instanceof UserServiceError) {
-		return NextResponse.json({ error: error.message }, { status: statusByCode[error.code] });
+		return NextResponse.json({ error: error.message }, { status: userStatusByCode[error.code] });
+	}
+
+	if (error instanceof McqServiceError) {
+		return NextResponse.json({ error: error.message }, { status: mcqStatusByCode[error.code] });
 	}
 
 	return NextResponse.json({ error: fallback }, { status: 500 });
