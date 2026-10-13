@@ -495,7 +495,7 @@ Test rules:
 - `migrations/create-mcq-tables.test.ts`
 - The three tables exist in local D1
 
-### Phase 2: Validators and services - PLANNED
+### Phase 2: Validators and services - COMPLETED
 
 **Objective**: Every read and write of questions, choices, and attempts goes through `mcq.ts` or `attempts.ts`, as shown by tests against a fake database.
 
@@ -539,7 +539,7 @@ Test rules:
 2. `src/lib/services/mcq.ts` with `McqServiceError`, the row-to-object mappers, and the five functions.
 3. `src/lib/services/attempts.ts` with `getQuestionForAttempt` and `recordAttempt`.
 
-**Green**: `npm test` passes Phase 1, Phase 2, and the existing auth suites.
+**Green**: On October 13, 2026, `npm test` failed to load the validator, MCQ service, and attempts suites because those modules did not exist (55 existing tests passed). After the modules were added, `npm test` passed 79 tests, including the auth suites. `npm run lint` and `npm run build` passed.
 
 **Deliverables**:
 
@@ -915,9 +915,9 @@ When working with this PRD:
 
 **Last Updated**: October 13, 2026
 
-**Current Phase**: Phase 1 - Database
+**Current Phase**: Phase 2 - Validators and services
 
-**Status**: COMPLETED, waiting for review
+**Status**: COMPLETED
 
 **Next Steps**:
 
@@ -930,5 +930,6 @@ When working with this PRD:
    - removing a choice deletes its attempts
    - deleting a user deletes their questions and attempts
 2. Work happens on branch `mcq-crud`.
-3. Phase 1 is ready for review. Schema tests were red (6 failed, migration file missing), then green (55 passed). `0002_create-mcq-tables.sql` is applied on local D1 only.
-4. Start Phase 2 after that review: write the validator and service tests, record the red run, and then add the modules.
+3. Phase 1 is complete. `0002_create-mcq-tables.sql` is applied on local D1 only.
+4. Phase 2 is complete. Validator, MCQ service, and attempts service tests were red before those modules existed, then `npm test` passed 79 tests.
+5. Start Phase 3 after review: write the route tests, record the red run, and then add the handlers.
