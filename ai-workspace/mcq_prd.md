@@ -124,7 +124,7 @@ CREATE INDEX idx_mcq_attempts_user_id ON mcq_attempts (user_id);
 
 Rules the schema enforces, and rules it leaves to the service:
 
-- The partial unique index `idx_mcq_choices_one_correct` allows at most one correct choice per question. The validator and the service require at least one.
+- The partial unique index `idx_mcq_choices_one_correct` allows at most one correct choice per question. Create and update both refuse to write unless exactly one choice is correct. A saved question always has one row with `is_correct = 1`.
 - SQLite cannot enforce "between 2 and 7 rows per question" without triggers. The validator and the service enforce the count. `position BETWEEN 1 AND 7` is a backstop.
 - `position` is not unique. If it were, renumbering choices during an edit could collide in the middle of a batch.
 - `mcq_attempts.is_correct` stores the result at the moment of the attempt. If the teacher later changes which choice is correct, earlier attempts keep their original result.
@@ -197,7 +197,7 @@ The existing `validationError` helper keys errors by `issue.path[0]`, so every c
 | --- | --- |
 | `listQuestions(): Promise<McqSummary[]>` | Every question, newest first (`created_at DESC, id`), each with its choice count and `createdBy` from a join to `users` |
 | `getQuestion(id): Promise<McqQuestion \| null>` | One question with its choices ordered by `position`, plus `createdBy` |
-| `createQuestion(input): Promise<McqQuestion>` | Looks up `input.userId` in `users` and throws `user_not_found` when it is missing, before any write. Generates ids with `crypto.randomUUID()`. Inserts the question, with `created_by`, and its choices in one `db.batch`. Sets each `position` from the array order, starting at 1 |
+| `createQuestion(input): Promise<McqQuestion>` | Looks up `input.userId` in `users` and throws `user_not_found` when it is missing, before any write. Refuses the write unless exactly one choice has `isCorrect: true`. Generates ids with `crypto.randomUUID()`. Inserts the question, with `created_by`, and its choices in one `db.batch`. Sets each `position` from the array order, starting at 1. Exactly one inserted choice has `is_correct = 1` |
 | `updateQuestion(id, input): Promise<McqQuestion>` | See the update order below. Does not change `created_by` |
 | `deleteQuestion(id): Promise<void>` | Deletes the question. The cascade removes its choices and attempts |
 
@@ -211,7 +211,7 @@ The existing `validationError` helper keys errors by `issue.path[0]`, so every c
 
 Update runs one `db.batch`, in this order:
 
-1. Load the current question and choices. If the question is missing, throw `not_found`. If a submitted choice `id` is not one of this question's choices, throw `invalid_choice`. Nothing is written in either case.
+1. Load the current question and choices. If the question is missing, throw `not_found`. If a submitted choice `id` is not one of this question's choices, throw `invalid_choice`. If the submitted choices do not contain exactly one correct choice, throw before any write. Nothing is written in any of these cases.
 2. `UPDATE mcq_questions` with name, question, description, and `updated_at`.
 3. `DELETE FROM mcq_choices WHERE id = ?1 AND question_id = ?2` once for each current choice that was not submitted.
 4. `UPDATE mcq_choices SET is_correct = 0 WHERE question_id = ?1`. This clears the old answer first, so the one-correct index never sees two correct choices.
@@ -391,12 +391,12 @@ Page files: `src/app/mcq/new/page.tsx` and `src/app/mcq/[id]/edit/page.tsx`. Bot
   - a radio item with accessible name "Choice N is correct"
   - an input labeled "Choice N"
   - a Remove button with accessible name "Remove choice N"
-- The radio items form one `RadioGroup`, so only one choice can be marked correct.
-- Create mode starts with 2 empty choices and none marked correct.
-- "Add choice" appends an empty row. It is disabled at 7 choices. Remove is disabled at 2 choices. Removing the row that was marked correct leaves no choice marked.
+- The radio items form one `RadioGroup`. One choice is always marked correct. The group does not allow clearing the selection.
+- Create mode starts with 2 empty choices. Choice 1 is marked correct.
+- "Add choice" appends an empty row that is not correct. It is disabled at 7 choices. Remove is disabled at 2 choices. Removing the choice that is marked correct marks the first remaining choice correct, so Save still has exactly one correct choice.
 - In edit mode, each choice row keeps its saved `id`, and that `id` is sent back on save. New rows have no `id`. The PUT body does not include `userId`, and the creator shown on the question does not change.
 - Save (`type="submit"`):
-  - Runs the shared Zod schema first. If it fails, it shows each message with `FieldError` and sends no request.
+  - Runs the shared Zod schema first. If it fails, it shows each message with `FieldError` and sends no request. The body always includes exactly one choice with `isCorrect: true`. Save does not send a question that has zero correct choices or more than one.
   - Create mode sends `POST /api/mcqs` with `userId` set to the stored teacher's id. Edit mode sends `PUT /api/mcqs/<id>`.
   - Save is disabled and labeled "Saving…" while the request is in flight.
   - On success, it navigates to `/mcq` and calls `router.refresh()`.
@@ -467,7 +467,7 @@ Test rules:
 
 ## Implementation Phases
 
-### Phase 1: Database - PLANNED
+### Phase 1: Database - COMPLETED
 
 **Objective**: Questions, choices, and attempts can be stored in local D1, and tests guard the schema.
 
@@ -487,7 +487,7 @@ Test rules:
 2. Write the SQL above.
 3. `npx wrangler d1 migrations apply faid-quiz-maker --local`.
 
-**Green**: `npm test` passes the new schema tests and the existing suites. Local D1 lists the three tables (`npx wrangler d1 execute faid-quiz-maker --local --command "SELECT name FROM sqlite_master WHERE type='table'"`). Remote D1 stays unchanged.
+**Green**: On October 13, 2026, `npm test` failed 6 schema tests before `migrations/0002_create-mcq-tables.sql` existed (49 existing tests passed, including `migrations/create-users.test.ts`). After the migration was added, `npm test` passed 55 tests. Local apply of `0002_create-mcq-tables.sql` succeeded and executed 11 commands. Local D1 lists `mcq_questions`, `mcq_choices`, and `mcq_attempts` alongside `users`. Remote D1 was not changed.
 
 **Deliverables**:
 
@@ -514,7 +514,7 @@ Test rules:
 
 `src/lib/services/mcq.test.ts` mocks `@/lib/db`.
 
-1. `createQuestion` makes one `db.batch` call with one question insert and one choice insert per choice. The question insert binds `created_by` to the given user id. Positions are 1..N in the submitted order. Exactly one stored choice has `is_correct = 1`. The returned question has the choices in order and `createdBy` for that user.
+1. `createQuestion` makes one `db.batch` call with one question insert and one choice insert per choice. The question insert binds `created_by` to the given user id. Positions are 1..N in the submitted order. Exactly one stored choice has `is_correct = 1`. The returned question has the choices in order and `createdBy` for that user. A call with zero correct choices or two correct choices throws before `db.batch`, and the fake holds no new rows.
 2. `createQuestion` stores a blank description as `''`.
 3. If the batch fails, `createQuestion` throws and the fake holds no partial rows.
 4. `createQuestion` throws `user_not_found` when the user id is missing from `users`, and it writes nothing.
@@ -522,7 +522,7 @@ Test rules:
 6. `getQuestion` returns choices ordered by `position` and `createdBy`, and returns `null` for an unknown id.
 7. `updateQuestion` changes the question fields and `updated_at`, keeps `created_by`, keeps the ids of submitted choices, inserts new choices, and deletes the ones left out.
 8. `updateQuestion` can move the correct answer from one existing choice to another without breaking the one-correct rule. This proves that the clear step runs before the set step.
-9. `updateQuestion` throws `not_found` for an unknown question and `invalid_choice` for a choice id from another question. Neither writes anything.
+9. `updateQuestion` throws `not_found` for an unknown question and `invalid_choice` for a choice id from another question. It also throws before any write when the new choices have zero correct choices or two correct choices. None of these write anything.
 10. `deleteQuestion` removes the question, its choices, and its attempts. It throws `not_found` for an unknown id.
 11. Every statement uses numbered placeholders. No submitted value appears in the SQL text.
 
@@ -644,12 +644,12 @@ Add to `src/components/signup-form.test.tsx` and `src/components/login-form.test
 
 **Red**: Add `src/components/mcq/mcq-editor.test.tsx` and confirm it fails.
 
-1. Create mode, with a stored teacher, shows "New question", empty Name, Question, and Description fields, 2 empty choice rows, and no choice marked correct.
+1. Create mode, with a stored teacher, shows "New question", empty Name, Question, and Description fields, and 2 empty choice rows. Choice 1 is marked correct.
 2. Create mode with no stored teacher shows "Log in to create a question" and a link to `/login`, and does not show Save or call `fetch`.
 3. "Add choice" adds rows up to 7 and is then disabled. "Remove choice N" is disabled at 2 rows.
-4. Only one choice can be marked correct at a time.
-5. Saving with no correct choice, a blank choice, or duplicate choices shows the matching message and does not call `fetch`.
-6. A valid create sends `POST /api/mcqs` with name, question, description, the stored `userId`, and choices in order, and no choice ids. On 201 it navigates to `/mcq` and calls `router.refresh()`.
+4. Only one choice can be marked correct at a time. Marking a different choice clears the previous one. Removing the correct choice marks the first remaining choice correct.
+5. Saving with a blank choice or duplicate choices shows the matching message and does not call `fetch`.
+6. A valid create sends `POST /api/mcqs` with name, question, description, the stored `userId`, and choices in order, and no choice ids. Exactly one choice in that body has `isCorrect: true`. On 201 it navigates to `/mcq` and calls `router.refresh()`.
 7. Save is disabled and labeled "Saving…" while the request is in flight.
 8. A 400 response with `fields.name` shows that message next to Name. A 500 response shows the API error.
 9. Edit mode shows "Edit question" and the saved values. It keeps each choice's `id` in the PUT body and leaves `id` off a newly added row. It sends `PUT /api/mcqs/<id>` with no `userId`.
@@ -710,7 +710,7 @@ Add to `src/components/signup-form.test.tsx` and `src/components/login-form.test
 
 ### Key Files
 
-- `migrations/0002_create-mcq-tables.sql`: questions, choices, and attempts tables and indexes
+- `migrations/0002_create-mcq-tables.sql`: questions, choices, and attempts tables and indexes. Applied locally on October 13, 2026. Not applied remotely.
 - `src/lib/validators/mcq.ts`: Zod schemas for create, update, and attempt, safe to import in the browser
 - `src/lib/current-user.ts`: read, save, and clear the teacher in `sessionStorage`
 - `src/lib/services/mcq.ts`: list, get, create, update, and delete questions and choices, and record `created_by`
@@ -733,6 +733,11 @@ Add to `src/components/signup-form.test.tsx` and `src/components/login-form.test
 Atomic create with ids generated in the service:
 
 ```typescript
+const correctCount = input.choices.filter((choice) => choice.isCorrect).length;
+if (correctCount !== 1) {
+  throw new Error("Mark exactly one choice as correct");
+}
+
 const db = await getDb();
 const questionId = crypto.randomUUID();
 const statements = [
@@ -791,7 +796,7 @@ export default async function McqPage() {
 
 ## Acceptance Criteria
 
-- [ ] A local migration creates `mcq_questions`, `mcq_choices`, and `mcq_attempts` with the columns, foreign keys, checks, and indexes above. `created_by` and `user_id` both reference `users (id)` with `ON DELETE CASCADE`.
+- [x] A local migration creates `mcq_questions`, `mcq_choices`, and `mcq_attempts` with the columns, foreign keys, checks, and indexes above. `created_by` and `user_id` both reference `users (id)` with `ON DELETE CASCADE`.
 - [ ] A question cannot be saved with fewer than 2 or more than 7 choices, without exactly one correct choice, with a blank choice, or with duplicate choices. This holds in the editor and at the API.
 - [ ] Creating a question writes the question, its `created_by`, and all its choices in one batch. A missing user returns 404 and leaves no rows. A failure leaves no partial rows.
 - [ ] `/mcq` lists every question, newest first, with Name, Question, Description, Created by, and Actions columns.
@@ -910,9 +915,9 @@ When working with this PRD:
 
 **Last Updated**: October 13, 2026
 
-**Current Phase**: Planning. No phase has started.
+**Current Phase**: Phase 1 - Database
 
-**Status**: PLANNED
+**Status**: COMPLETED, waiting for review
 
 **Next Steps**:
 
@@ -925,4 +930,5 @@ When working with this PRD:
    - removing a choice deletes its attempts
    - deleting a user deletes their questions and attempts
 2. Work happens on branch `mcq-crud`.
-3. Start Phase 1: write `migrations/create-mcq-tables.test.ts`, record the red run, and then add the migration.
+3. Phase 1 is ready for review. Schema tests were red (6 failed, migration file missing), then green (55 passed). `0002_create-mcq-tables.sql` is applied on local D1 only.
+4. Start Phase 2 after that review: write the validator and service tests, record the red run, and then add the modules.
