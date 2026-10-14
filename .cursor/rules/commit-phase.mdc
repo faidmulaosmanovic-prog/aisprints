@@ -1,0 +1,22 @@
+---
+description: Ask before committing and pushing a completed phase to the current feature branch
+alwaysApply: true
+---
+
+# Commit a completed phase
+
+After a phase implementation is finished, stop. Do not commit or push until the user has reviewed the work and explicitly approved it.
+
+1. Report what was completed, including test, lint, and build results.
+2. Ask the user to review and approve committing and pushing to the current branch.
+3. Wait. Do not stage, commit, or push in that same turn.
+
+When the user approves, commit the phase on the current branch and push that branch. Do not open a new branch, and do not push to `main`.
+
+```text
+Phase 6 is complete. npm test, lint, and build passed.
+
+Review the changes, then tell me if I should commit and push them to mcq-crud.
+```
+
+Approval is a direct request such as "commit and push" or "yes, push it". A review comment, a bug report, or "it works" is not approval. Fix the review first, then ask again.
