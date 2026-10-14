@@ -667,7 +667,7 @@ Add to `src/components/signup-form.test.tsx` and `src/components/login-form.test
 
 - Create and edit work end to end against local D1 under `npm run preview`
 
-### Phase 6: Preview, attempts, and verification - PLANNED
+### Phase 6: Preview, attempts, and verification - COMPLETED
 
 **Objective**: A teacher can answer a question in preview, each submit is stored as an attempt, and the whole feature passes on the Workers preview.
 
@@ -687,7 +687,7 @@ Add to `src/components/signup-form.test.tsx` and `src/components/login-form.test
 1. `src/components/mcq/mcq-preview.tsx`.
 2. `src/app/mcq/[id]/preview/page.tsx`, which loads `getQuestionForAttempt(id)` and calls `notFound()` when it returns `null`.
 
-**Green**: `npm test` passes through Phase 6. Then:
+**Green**: On October 14, 2026, `npm test` failed to load `mcq-preview` because the component did not exist (115 existing tests passed). After the preview was added, `npm test` passed 123 tests. `npm run lint` and `npm run build` passed, and `/mcq/[id]/preview` is dynamic. Then:
 
 1. `npm run lint` and `npm run build` succeed.
 2. On `npm run preview` (`http://localhost:3000`), walk through these steps in the browser:
@@ -699,6 +699,15 @@ Add to `src/components/signup-form.test.tsx` and `src/components/login-form.test
    6. Delete the question.
    7. Confirm that its choices and attempts are gone.
 3. Record the actual results in Technical Implementation Details.
+
+Walkthrough on October 14, 2026 at `http://localhost:3000` against local D1, signed in as `faid98`:
+
+- Created "Leaf colors" with Water, Chlorophyll, and Sunlight. Chlorophyll was correct. The list showed Created by "FM MM".
+- Edit added Soil, marked Soil correct, and kept `created_by` as `1aee206a-aa9f-459d-8899-f39b1f1cae16`. The original three choice ids were unchanged.
+- Preview did not show the correct choice before submit. Water was Incorrect. Soil was Correct.
+- `mcq_attempts` had two rows for that `user_id`: Water with `is_correct` 0, Soil with `is_correct` 1.
+- Delete removed the question. Local D1 then had 0 questions, 0 choices, and 0 attempts for that id.
+- `/mcq/missing-question/edit` and `/mcq/missing-question/preview` both returned 404.
 
 **Deliverables**:
 
@@ -803,15 +812,15 @@ export default async function McqPage() {
 - [x] The Actions menu on each row offers Edit, Preview, and Delete.
 - [x] "New question" opens `/mcq/new`. With a stored teacher, Save creates the question for that teacher and returns to `/mcq`. Without a stored teacher, the page links to `/login` and does not save. Cancel returns to `/mcq` without saving.
 - [x] Edit loads the saved values. Save updates the question, keeps `created_by`, keeps the ids of unchanged choices, adds new choices, removes the ones that were dropped, and can change the correct answer.
-- [ ] An unknown id on edit or preview shows the Next.js 404 page. An unknown id on the API returns 404 "Question not found".
+- [x] An unknown id on edit or preview shows the Next.js 404 page. An unknown id on the API returns 404 "Question not found".
 - [x] Delete asks for confirmation. Confirming removes the question, its choices, and its attempts, then refreshes the table. Cancel changes nothing.
-- [ ] Preview does not send which choice is correct before an attempt is submitted.
-- [ ] Submitting an answer in preview inserts one `mcq_attempts` row with the selected `choice_id`, the stored teacher's `user_id`, and the correct flag decided by the server, and shows Correct or Incorrect.
+- [x] Preview does not send which choice is correct before an attempt is submitted.
+- [x] Submitting an answer in preview inserts one `mcq_attempts` row with the selected `choice_id`, the stored teacher's `user_id`, and the correct flag decided by the server, and shows Correct or Incorrect.
 - [x] A choice id from another question is rejected with 400 on update and on attempt.
 - [x] Register and login store the teacher. Logout clears that store and returns to `/login`.
-- [ ] Every phase's tests were red before the code existed and green after it. The full `npm test` suite, including auth, is green. Phases 1–4 are recorded. Phases 5 and 6 are still planned.
+- [x] Every phase's tests were red before the code existed and green after it. The full `npm test` suite, including auth, is green.
 - [x] `npm run lint` and `npm run build` succeed.
-- [ ] The full flow has been exercised in the browser on `npm run preview`, and the attempt rows were checked in local D1.
+- [x] The full flow has been exercised in the browser on `npm run preview`, and the attempt rows were checked in local D1.
 
 ---
 
@@ -891,6 +900,7 @@ No environment variables are needed.
 
 - **October 13, 2026 — shadcn CLI and `cn`**: `npx shadcn@latest add` stopped to ask whether to overwrite `button.tsx`. Answer no. It still installs the `cn` package and writes `import { cn } from "cn"` in new files, while the rest of this repo imports `cn` from `@/lib/utils`. Uninstall `cn` and change only that import in the new files. Do not overwrite `button.tsx`.
 - **October 13, 2026 — "New question" role**: Rendering the create control with `Button`'s `render` prop sets `role="button"` on the anchor, so it is no longer a link. Use `Link` with `buttonVariants()` so the control stays a link to `/mcq/new`.
+- **October 14, 2026 — locked preview radios**: Base UI renders each radio as a `span`, so a locked choice sets `aria-disabled="true"` rather than the DOM `disabled` property.
 
 ---
 
@@ -914,9 +924,9 @@ When working with this PRD:
 
 ## Current Status
 
-**Last Updated**: October 13, 2026
+**Last Updated**: October 14, 2026
 
-**Current Phase**: Phase 5 - Question editor
+**Current Phase**: Phase 6 - Preview, attempts, and verification
 
 **Status**: COMPLETED
 
@@ -936,4 +946,4 @@ When working with this PRD:
 5. Phase 3 is complete. Route tests were red before the handlers existed, then `npm test` passed 92 tests.
 6. Phase 4 is complete. List tests were red before the page existed, then `npm test` passed 105 tests. `/mcq` lists questions and deletes them after confirmation. Register and login store the teacher; logout clears that store.
 7. Phase 5 is complete. The editor suite was red before the component existed, then `npm test` passed 115 tests. Create and edit work on the dev server against local D1.
-8. Start Phase 6 after review: preview, attempts, and the full browser pass on `npm run preview`. Do not start it until asked.
+8. Phase 6 is complete. The preview suite was red before the component existed, then `npm test` passed 123 tests. The full create, edit, preview, attempt, and delete walkthrough passed at `http://localhost:3000` against local D1.
