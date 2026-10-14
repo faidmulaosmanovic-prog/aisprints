@@ -1,11 +1,11 @@
 Date created: October 13, 2026
-Date last modified: October 13, 2026
+Date last modified: October 14, 2026
 
 # Multiple-Choice Questions (Create, Edit, Preview, Delete) - Technical PRD
 
 ## Overview/Problem
 
-Teachers can register and log in, but `/mcq` is only a stub. Right now Quiz Maker cannot store a single question. This feature turns `/mcq` into a question bank. A teacher can create a multiple-choice question with 2 to 7 choices and mark one as correct. The teacher can also edit the question, preview it the way a student would see it, and delete it. Each answer submitted in preview is stored as an attempt, along with whether the chosen answer was correct. The question records which teacher created it, and the attempt records which teacher answered it.
+Teachers can register and log in. Before this feature, `/mcq` was only a stub and Quiz Maker could not store a question. `/mcq` is now a question bank. A teacher can create a multiple-choice question with 2 to 7 choices and mark one as correct. The teacher can also edit the question, preview it the way a student would see it, and delete it. Each answer submitted in preview is stored as an attempt, along with whether the chosen answer was correct. The question records which teacher created it, and the attempt records which teacher answered it.
 
 Every primary key is a database id named `id`. Foreign keys are named `<table>_id`, except `mcq_questions.created_by`, which names the role (the teacher who wrote the question) and references `users.id`.
 
@@ -72,14 +72,14 @@ We believe a question table with one create/edit screen, a recorded creator, and
 
 Database `faid-quiz-maker` is already bound as `DB`. Do not create a new database, and do not change the binding. `0001_create-users.sql` stays unchanged.
 
-Create the migration and apply it locally only:
+Phase 1 created the migration and applied it locally:
 
 ```bash
 npx wrangler d1 migrations create faid-quiz-maker create-mcq-tables
 npx wrangler d1 migrations apply faid-quiz-maker --local
 ```
 
-Expected file: `migrations/0002_create-mcq-tables.sql`.
+The file is `migrations/0002_create-mcq-tables.sql`. That phase did not change remote D1. The remote apply on October 14, 2026 is in Production Deployment Evidence.
 
 ```sql
 CREATE TABLE mcq_questions (
@@ -341,19 +341,19 @@ shadcn components used:
 | `card` | Installed | Editor and preview containers |
 | `field` | Installed | `FieldSet`, `FieldGroup`, `Field`, `FieldLabel`, `FieldDescription`, `FieldError` in the editor |
 | `input` | Installed | Name and choice labels |
-| `badge` | Installed | Choice count in the table, "Correct" and "Incorrect" in preview |
-| `dropdown-menu` | Add | Actions menu on each row |
-| `alert-dialog` | Add | Delete confirmation |
-| `textarea` | Add | Question and description |
-| `radio-group` | Add | Marking the correct choice in the editor, picking an answer in preview |
+| `badge` | Installed | "Correct" and "Incorrect" in preview |
+| `dropdown-menu` | Installed in Phase 4 | Actions menu on each row |
+| `alert-dialog` | Installed in Phase 4 | Delete confirmation |
+| `textarea` | Installed in Phase 4 | Question and description |
+| `radio-group` | Installed in Phase 4 | Marking the correct choice in the editor, picking an answer in preview |
 
-Add them with:
+They were added with:
 
 ```bash
 npx shadcn@latest add @shadcn/dropdown-menu @shadcn/alert-dialog @shadcn/textarea @shadcn/radio-group
 ```
 
-Each one must create a file in `src/components/ui/`. If the CLI wants to install a new npm package, stop and ask before accepting. All four are expected to use the already installed `@base-ui/react`. Do not hand-edit the generated files. Icons come from `lucide-react` (`Plus`, `MoreHorizontal`, `Pencil`, `Eye`, `Trash2`, `X`).
+Each one created a file in `src/components/ui/`. If the CLI wants to install a new npm package, stop and ask before accepting. All four use the already installed `@base-ui/react`. Do not hand-edit the generated files, except the `cn` import fix in the Troubleshooting Guide. Icons in the question list come from `lucide-react` (`Plus`, `MoreHorizontal`, `Pencil`, `Eye`, `Trash2`).
 
 #### MCQ list (`/mcq`)
 
@@ -378,7 +378,7 @@ Page file: `src/app/mcq/page.tsx`. It calls `listQuestions()` and renders `McqLi
 
 #### Question editor (`/mcq/new` and `/mcq/[id]/edit`)
 
-Page files: `src/app/mcq/new/page.tsx` and `src/app/mcq/[id]/edit/page.tsx`. Both render `McqEditor` from `@/components/mcq/mcq-editor`. The edit page passes `initialQuestion`.
+Page files: `src/app/mcq/new/page.tsx` and `src/app/mcq/[id]/edit/page.tsx`. Both render `McqEditor` from `@/components/mcq/mcq-editor`. The edit page passes the loaded question as `question`.
 
 - Card title: "New question" in create mode, "Edit question" in edit mode.
 - Fields, in order:
@@ -426,7 +426,7 @@ There is still no server session. Register and login already return the public u
 `src/lib/current-user.ts` is safe to import from client components. It does not import `@/lib/db` or either service. It reads and writes `sessionStorage` under the key `quiz-maker.user`.
 
 ```ts
-type StoredUser = {
+type CurrentUser = {
   id: string;
   firstName: string;
   lastName: string;
@@ -434,7 +434,7 @@ type StoredUser = {
 };
 ```
 
-- `saveCurrentUser(user)` stores that object. `SignupForm` calls it on 201, and `LoginForm` calls it on 200, before navigating to `/mcq`.
+- `saveCurrentUser(user)` stores that object. `SignupForm` calls `saveReturnedUser` on 201, and `LoginForm` calls `saveReturnedUser` on 200, before navigating to `/mcq`. `saveReturnedUser` keeps only `id`, `firstName`, `lastName`, and `username`, then calls `saveCurrentUser`.
 - `readCurrentUser()` returns the object, or `null` when the key is missing or the JSON is not that shape.
 - `clearCurrentUser()` removes the key. `LogoutButton` calls it when logout is clicked, before the request returns.
 - `sessionStorage` lasts for the tab. A new tab does not have the teacher, and neither does a browser that never logged in. Those visitors can read `/mcq` and open preview, and they are sent to `/login` before creating a question or submitting an answer.
@@ -487,7 +487,7 @@ Test rules:
 2. Write the SQL above.
 3. `npx wrangler d1 migrations apply faid-quiz-maker --local`.
 
-**Green**: On October 13, 2026, `npm test` failed 6 schema tests before `migrations/0002_create-mcq-tables.sql` existed (49 existing tests passed, including `migrations/create-users.test.ts`). After the migration was added, `npm test` passed 55 tests. Local apply of `0002_create-mcq-tables.sql` succeeded and executed 11 commands. Local D1 lists `mcq_questions`, `mcq_choices`, and `mcq_attempts` alongside `users`. Remote D1 was not changed.
+**Green**: On October 13, 2026, `npm test` failed 6 schema tests before `migrations/0002_create-mcq-tables.sql` existed (49 existing tests passed, including `migrations/create-users.test.ts`). After the migration was added, `npm test` passed 55 tests. Local apply of `0002_create-mcq-tables.sql` succeeded and executed 11 commands. Local D1 lists `mcq_questions`, `mcq_choices`, and `mcq_attempts` alongside `users`. Remote D1 was not changed in this phase. It was applied on October 14, 2026; see Production Deployment Evidence.
 
 **Deliverables**:
 
@@ -665,11 +665,11 @@ Add to `src/components/signup-form.test.tsx` and `src/components/login-form.test
 
 **Deliverables**:
 
-- Create and edit work end to end against local D1 under `npm run preview`
+- Create and edit work end to end on `npm run dev` at `http://localhost:3000` against local D1
 
 ### Phase 6: Preview, attempts, and verification - COMPLETED
 
-**Objective**: A teacher can answer a question in preview, each submit is stored as an attempt, and the whole feature passes on the Workers preview.
+**Objective**: A teacher can answer a question in preview, each submit is stored as an attempt, and the whole feature is checked locally before it is checked on production.
 
 **Red**: Add `src/components/mcq/mcq-preview.test.tsx` and confirm it fails.
 
@@ -687,18 +687,7 @@ Add to `src/components/signup-form.test.tsx` and `src/components/login-form.test
 1. `src/components/mcq/mcq-preview.tsx`.
 2. `src/app/mcq/[id]/preview/page.tsx`, which loads `getQuestionForAttempt(id)` and calls `notFound()` when it returns `null`.
 
-**Green**: On October 14, 2026, `npm test` failed to load `mcq-preview` because the component did not exist (115 existing tests passed). After the preview was added, `npm test` passed 123 tests. `npm run lint` and `npm run build` passed, and `/mcq/[id]/preview` is dynamic. Then:
-
-1. `npm run lint` and `npm run build` succeed.
-2. On `npm run preview` (`http://localhost:3000`), walk through these steps in the browser:
-   1. Register or log in, then create a question with 3 choices.
-   2. See it in the table, with the creator's name in Created by.
-   3. Edit it to add a fourth choice and change the correct answer. Confirm `created_by` is unchanged.
-   4. Preview it and submit one correct and one incorrect answer.
-   5. Confirm two rows in `mcq_attempts`, each with that teacher's `user_id`, with `npx wrangler d1 execute faid-quiz-maker --local --command "SELECT user_id, choice_id, is_correct FROM mcq_attempts"`.
-   6. Delete the question.
-   7. Confirm that its choices and attempts are gone.
-3. Record the actual results in Technical Implementation Details.
+**Green**: On October 14, 2026, `npm test` failed to load `mcq-preview` because the component did not exist (115 existing tests passed). After the preview was added, `npm test` passed 123 tests. `npm run lint` and `npm run build` passed, and `/mcq/[id]/preview` is dynamic. The local browser pass below was then run on `npm run dev` at `http://localhost:3000` against local D1, before the production check: register or log in, create a question with 3 choices, see the creator in the table, edit it to add a fourth choice and change the correct answer, preview one correct and one incorrect answer, confirm both attempt rows in local D1, delete the question, and confirm its choices and attempts are gone.
 
 Walkthrough on October 14, 2026 at `http://localhost:3000` against local D1, signed in as `faid98`:
 
@@ -711,7 +700,7 @@ Walkthrough on October 14, 2026 at `http://localhost:3000` against local D1, sig
 
 **Deliverables**:
 
-- The full create, list, edit, preview, attempt, and delete flow works on the local app and on production
+- The local create, list, edit, preview, attempt, and delete walkthrough is recorded above. The production check, done after that local pass, is in Production Deployment Evidence.
 
 ### Production Deployment Evidence
 
@@ -732,9 +721,9 @@ Feature links:
 - Login: https://quiz.faidquizmaker.workers.dev/login
 - Register: https://quiz.faidquizmaker.workers.dev/register
 
-Checked on October 14, 2026 against that deployed URL. `/`, `/mcq`, `/mcq/new`, `/login`, and `/register` each returned HTTP 200. `/mcq/missing-question/edit` and `/mcq/missing-question/preview` each returned HTTP 404.
+Faid checks this feature locally first, then on production. The local pass is the October 14, 2026 walkthrough at `http://localhost:3000` (`npm run dev`, local D1) in Phase 6. After that local check, he deployed this version and reported that the production app works, including creating a question, updating it, and previewing it.
 
-Faid deployed this version and confirmed that creating a question, updating it, and previewing it all work in production.
+Page loads checked on October 14, 2026 against that deployed URL: `/`, `/mcq`, `/mcq/new`, `/login`, and `/register` each returned HTTP 200. `/mcq/missing-question/edit` and `/mcq/missing-question/preview` each returned HTTP 404. Those status checks are separate from his local-then-production review of create, update, and preview.
 
 Production database status: `0002_create-mcq-tables.sql` is applied on remote D1 database `faid-quiz-maker` (`e8a16210-2d19-4b96-8354-aaf0fddf8b9f`). `d1_migrations` records that file with `applied_at` `2026-10-14 08:12:41`. The apply executed 11 commands and Wrangler marked the file successful. `npx wrangler d1 migrations list faid-quiz-maker --remote` then reported no migrations left to apply. Remote tables include `mcq_questions`, `mcq_choices`, and `mcq_attempts`, with `idx_mcq_questions_created_at`, `idx_mcq_questions_created_by`, `idx_mcq_choices_question_id`, `idx_mcq_choices_one_correct`, `idx_mcq_attempts_question_id`, `idx_mcq_attempts_choice_id`, and `idx_mcq_attempts_user_id`. `0001_create-users.sql` remains applied at `2026-10-09 11:00:10`.
 
@@ -820,7 +809,7 @@ export default async function McqPage() {
 
 - No new npm dependencies are expected. If the shadcn CLI asks to install a package, stop and ask.
 - D1 is reachable only from server code. `mcq.ts` and `attempts.ts` must never be imported from a `'use client'` file. Client components receive plain objects as props and send writes through `fetch`.
-- `npm run dev` runs on Node with emulated bindings. Verify the flow with `npm run preview` before calling the feature done.
+- `npm run dev` runs on Node with emulated bindings, at `http://localhost:3000`. The recorded local browser passes for this feature used that server and local D1. Faid checks locally first, then checks production after deploy. `npm run preview` is the local Workers runtime and was not the recorded browser pass.
 - D1 stores booleans as `0` and `1`. Convert them in the row mappers, and never send `0` or `1` to the client.
 - `created_by` and `user_id` are required. Do not insert a question or an attempt without a user id that exists in `users`.
 - The stored teacher is client state. Do not treat `sessionStorage` as authentication, and do not add a cookie or a session table while building this feature.
@@ -845,7 +834,7 @@ export default async function McqPage() {
 - [x] Register and login store the teacher. Logout clears that store and returns to `/login`.
 - [x] Every phase's tests were red before the code existed and green after it. The full `npm test` suite, including auth, is green.
 - [x] `npm run lint` and `npm run build` succeed.
-- [x] The full flow has been exercised in the browser on `npm run preview`, and the attempt rows were checked in local D1.
+- [x] The full flow was exercised in the browser on `npm run dev` at `http://localhost:3000` against local D1, and the attempt rows were checked in local D1. After that local check, Faid reported that create, update, and preview work on production.
 
 ---
 
@@ -941,7 +930,7 @@ When working with this PRD:
 6. Correctness of an attempt is decided on the server from `mcq_choices.is_correct`. Never trust a correctness value from the client. The attempt's `userId` must be a real `users.id`, and it is still not proof of who sent the request.
 7. `0002_create-mcq-tables.sql` is already applied remotely. Do not run `migrations apply --remote` or `npm run deploy` again without explicit approval.
 8. Ask before adding any npm package, including one that the shadcn CLI proposes.
-9. Update phase status markers, Technical Implementation Details, and acceptance checkboxes as work lands. Record actual `npm test`, lint, build, and preview results, not expected ones.
+9. Update phase status markers, Technical Implementation Details, and acceptance checkboxes as work lands. Record actual `npm test`, lint, build, and browser results, not expected ones. Local checks come before production checks.
 10. Add troubleshooting entries when bugs are found and fixed.
 11. Use `filepath:line-number` when citing code.
 
@@ -955,7 +944,7 @@ When working with this PRD:
 
 **Status**: COMPLETED
 
-**Production**: https://quiz.faidquizmaker.workers.dev — version `b74a9566-aefb-4367-b47c-91b79f7d82de`. Create, edit, and preview are confirmed working. Remote migration `0002_create-mcq-tables.sql` was applied at `2026-10-14 08:12:41`.
+**Production**: https://quiz.faidquizmaker.workers.dev — version `b74a9566-aefb-4367-b47c-91b79f7d82de`. Faid checked the feature locally at `http://localhost:3000` first, then on production, and reported that create, edit, and preview work. Remote migration `0002_create-mcq-tables.sql` was applied at `2026-10-14 08:12:41`.
 
 **Next Steps**:
 
@@ -974,4 +963,4 @@ When working with this PRD:
 6. Phase 4 is complete. List tests were red before the page existed, then `npm test` passed 105 tests. `/mcq` lists questions and deletes them after confirmation. Register and login store the teacher; logout clears that store.
 7. Phase 5 is complete. The editor suite was red before the component existed, then `npm test` passed 115 tests. Create and edit work on the dev server against local D1.
 8. Phase 6 is complete. The preview suite was red before the component existed, then `npm test` passed 123 tests. The full create, edit, preview, attempt, and delete walkthrough passed at `http://localhost:3000` against local D1.
-9. Production is live. Open [the question list](https://quiz.faidquizmaker.workers.dev/mcq), [new question](https://quiz.faidquizmaker.workers.dev/mcq/new), and a saved question's `/edit` and `/preview` paths to confirm create, update, and preview.
+9. Production is live. After the local walkthrough at `http://localhost:3000`, Faid checked [the question list](https://quiz.faidquizmaker.workers.dev/mcq), [new question](https://quiz.faidquizmaker.workers.dev/mcq/new), and a saved question's `/edit` and `/preview` paths, and reported that create, update, and preview work.
