@@ -53,7 +53,7 @@ We believe a question table with one create/edit screen, a recorded creator, and
 - Search, filters, sorting controls, and pagination in the table. The table shows every question, newest first.
 - Reordering choices by drag and drop. Choices keep the order they were entered in.
 - Duplicating a question.
-- Applying the new migration to remote D1 and deploying. Both need explicit human approval.
+- Further remote migrations or deploys beyond the October 14, 2026 release. That release is recorded in Production Deployment Evidence.
 - `@cloudflare/vitest-pool-workers` and any unit test that opens a real D1 database, a real network, or the Workers runtime.
 
 ### Cut
@@ -711,7 +711,32 @@ Walkthrough on October 14, 2026 at `http://localhost:3000` against local D1, sig
 
 **Deliverables**:
 
-- The full create, list, edit, preview, attempt, and delete flow works on the local Workers preview
+- The full create, list, edit, preview, attempt, and delete flow works on the local app and on production
+
+### Production Deployment Evidence
+
+Deployment command: `npm run deploy`
+
+Deployment result: Success. Wrangler logged `Deployed quiz triggers (3.26 sec)` and Current Version ID `b74a9566-aefb-4367-b47c-91b79f7d82de`.
+
+Production URL: https://quiz.faidquizmaker.workers.dev
+
+Deployment date: October 14, 2026. The remote migration in the same session was applied at 10:12:41 CEST.
+
+Feature links:
+
+- List: https://quiz.faidquizmaker.workers.dev/mcq
+- Create: https://quiz.faidquizmaker.workers.dev/mcq/new
+- Edit: https://quiz.faidquizmaker.workers.dev/mcq/[id]/edit
+- Preview: https://quiz.faidquizmaker.workers.dev/mcq/[id]/preview
+- Login: https://quiz.faidquizmaker.workers.dev/login
+- Register: https://quiz.faidquizmaker.workers.dev/register
+
+Checked on October 14, 2026 against that deployed URL. `/`, `/mcq`, `/mcq/new`, `/login`, and `/register` each returned HTTP 200. `/mcq/missing-question/edit` and `/mcq/missing-question/preview` each returned HTTP 404.
+
+Faid deployed this version and confirmed that creating a question, updating it, and previewing it all work in production.
+
+Production database status: `0002_create-mcq-tables.sql` is applied on remote D1 database `faid-quiz-maker` (`e8a16210-2d19-4b96-8354-aaf0fddf8b9f`). `d1_migrations` records that file with `applied_at` `2026-10-14 08:12:41`. The apply executed 11 commands and Wrangler marked the file successful. `npx wrangler d1 migrations list faid-quiz-maker --remote` then reported no migrations left to apply. Remote tables include `mcq_questions`, `mcq_choices`, and `mcq_attempts`, with `idx_mcq_questions_created_at`, `idx_mcq_questions_created_by`, `idx_mcq_choices_question_id`, `idx_mcq_choices_one_correct`, `idx_mcq_attempts_question_id`, `idx_mcq_attempts_choice_id`, and `idx_mcq_attempts_user_id`. `0001_create-users.sql` remains applied at `2026-10-09 11:00:10`.
 
 ---
 
@@ -719,7 +744,7 @@ Walkthrough on October 14, 2026 at `http://localhost:3000` against local D1, sig
 
 ### Key Files
 
-- `migrations/0002_create-mcq-tables.sql`: questions, choices, and attempts tables and indexes. Applied locally on October 13, 2026. Not applied remotely.
+- `migrations/0002_create-mcq-tables.sql`: questions, choices, and attempts tables and indexes. Applied locally on October 13, 2026, and on remote D1 at `2026-10-14 08:12:41`.
 - `src/lib/validators/mcq.ts`: Zod schemas for create, update, and attempt, safe to import in the browser
 - `src/lib/current-user.ts`: read, save, and clear the teacher in `sessionStorage`
 - `src/lib/services/mcq.ts`: list, get, create, update, and delete questions and choices, and record `created_by`
@@ -799,7 +824,7 @@ export default async function McqPage() {
 - D1 stores booleans as `0` and `1`. Convert them in the row mappers, and never send `0` or `1` to the client.
 - `created_by` and `user_id` are required. Do not insert a question or an attempt without a user id that exists in `users`.
 - The stored teacher is client state. Do not treat `sessionStorage` as authentication, and do not add a cookie or a session table while building this feature.
-- Do not apply `0002_create-mcq-tables.sql` to remote D1 and do not deploy without explicit approval. Production currently has only `0001_create-users.sql`, so deploying this code before the remote migration would break `/mcq` in production.
+- `0002_create-mcq-tables.sql` is applied on remote D1, and the app is deployed. A later remote migration or deploy still needs explicit approval.
 
 ---
 
@@ -841,7 +866,7 @@ export default async function McqPage() {
 
 ### External Dependencies
 
-- Cloudflare D1 (`faid-quiz-maker`, binding `DB`): stores the three new tables. Local only until the remote migration is approved.
+- Cloudflare D1 (`faid-quiz-maker`, binding `DB`, id `e8a16210-2d19-4b96-8354-aaf0fddf8b9f`): stores the three new tables. `0002_create-mcq-tables.sql` is applied locally and remotely.
 
 ### Internal Dependencies
 
@@ -875,7 +900,7 @@ No environment variables are needed.
 - **Mitigation**: Use `findByRole` after opening. Add the smallest polyfill needed in `vitest.setup.ts` and record it in the Troubleshooting Guide. Do not change the test environment or add a dependency without asking.
 
 - **Risk**: The code is deployed before the remote migration, and production `/mcq` fails because the tables are missing.
-- **Mitigation**: Release requires an approved remote migration first. Deployment is not part of this PRD.
+- **Mitigation**: Closed for this release. `0002_create-mcq-tables.sql` was applied remotely at `2026-10-14 08:12:41`, and version `b74a9566-aefb-4367-b47c-91b79f7d82de` is deployed. A later migration still needs approval before it is applied remotely.
 
 ### User Experience Risks
 
@@ -914,7 +939,7 @@ When working with this PRD:
 4. For each phase, write the listed tests, run `npm test`, and confirm they fail before writing production code. Mark the phase complete only when `npm test` is green and the related acceptance criteria pass.
 5. All D1 access goes through `src/lib/services/mcq.ts` or `src/lib/services/attempts.ts`. Route handlers and pages call those services, never `getDb`.
 6. Correctness of an attempt is decided on the server from `mcq_choices.is_correct`. Never trust a correctness value from the client. The attempt's `userId` must be a real `users.id`, and it is still not proof of who sent the request.
-7. Apply migrations locally only. Do not run `migrations apply --remote` and do not run `npm run deploy` without explicit approval.
+7. `0002_create-mcq-tables.sql` is already applied remotely. Do not run `migrations apply --remote` or `npm run deploy` again without explicit approval.
 8. Ask before adding any npm package, including one that the shadcn CLI proposes.
 9. Update phase status markers, Technical Implementation Details, and acceptance checkboxes as work lands. Record actual `npm test`, lint, build, and preview results, not expected ones.
 10. Add troubleshooting entries when bugs are found and fixed.
@@ -926,9 +951,11 @@ When working with this PRD:
 
 **Last Updated**: October 14, 2026
 
-**Current Phase**: Phase 6 - Preview, attempts, and verification
+**Current Phase**: Released
 
 **Status**: COMPLETED
+
+**Production**: https://quiz.faidquizmaker.workers.dev — version `b74a9566-aefb-4367-b47c-91b79f7d82de`. Create, edit, and preview are confirmed working. Remote migration `0002_create-mcq-tables.sql` was applied at `2026-10-14 08:12:41`.
 
 **Next Steps**:
 
@@ -940,10 +967,11 @@ When working with this PRD:
    - edit and delete stay open to any visitor
    - removing a choice deletes its attempts
    - deleting a user deletes their questions and attempts
-2. Work happens on branch `mcq-crud`.
-3. Phase 1 is complete. `0002_create-mcq-tables.sql` is applied on local D1 only.
+2. Work happened on branch `mcq-crud`.
+3. Phase 1 is complete. `0002_create-mcq-tables.sql` is applied on local D1 and on remote D1.
 4. Phase 2 is complete. `npm test` passed 79 tests after the services existed.
 5. Phase 3 is complete. Route tests were red before the handlers existed, then `npm test` passed 92 tests.
 6. Phase 4 is complete. List tests were red before the page existed, then `npm test` passed 105 tests. `/mcq` lists questions and deletes them after confirmation. Register and login store the teacher; logout clears that store.
 7. Phase 5 is complete. The editor suite was red before the component existed, then `npm test` passed 115 tests. Create and edit work on the dev server against local D1.
 8. Phase 6 is complete. The preview suite was red before the component existed, then `npm test` passed 123 tests. The full create, edit, preview, attempt, and delete walkthrough passed at `http://localhost:3000` against local D1.
+9. Production is live. Open [the question list](https://quiz.faidquizmaker.workers.dev/mcq), [new question](https://quiz.faidquizmaker.workers.dev/mcq/new), and a saved question's `/edit` and `/preview` paths to confirm create, update, and preview.
